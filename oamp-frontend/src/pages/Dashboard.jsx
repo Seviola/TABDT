@@ -30,6 +30,7 @@ import {
   UserPlus,
   Download,
   Trophy,
+  Clock,
   Settings,
   Layers,
   Eye,
@@ -159,6 +160,12 @@ export function Dashboard() {
     refetchInterval: isReadOnly ? false : 5000,
   });
 
+  const { data: timeStatsRes } = useQuery({
+    queryKey: ["time-stats", leaderboardMode, selectedBatchId],
+    queryFn: () => api.get("/leaderboard/time-stats", batchParams),
+    refetchInterval: isReadOnly ? false : 5000,
+  });
+
   async function handleStartNewSession() {
     if (!newSessionName.trim()) {
       toast.error("Nama sesi tidak boleh kosong.");
@@ -220,12 +227,18 @@ export function Dashboard() {
   const rawTimeline = useMemo(() => timeRes?.data?.data || timeRes?.data || [], [timeRes]);
 
   const totalParticipants = leaderboard.length;
-  const best = leaderboard[0]?.score;
-  const bestScore = best != null ? Math.round(best) : null;
-  const avg = leaderboard.length > 0
-    ? leaderboard.reduce((a, b) => a + (b.score || 0), 0) / Math.max(leaderboard.length, 1)
-    : 0;
-  const avgScore = leaderboard.length > 0 && !Number.isNaN(avg) ? Math.round(avg) : null;
+
+  const timeStats = timeStatsRes?.data || {};
+
+  const fastestTime =
+    Number(timeStats.fastest_time) > 0
+      ? Number(timeStats.fastest_time)
+      : null;
+
+  const averageTime =
+    Number(timeStats.average_time) > 0
+      ? Number(timeStats.average_time)
+      : null;
 
   const topPlayers = useMemo(
     () => leaderboard.slice(0, 8).map((p) => p.name),
@@ -378,12 +391,12 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <StatCard title="Total Players" value={totalParticipants} icon={<Users className="h-5 w-5" />} color="blue" />
-        <StatCard title="Highest Score" value={bestScore} icon={<Trophy className="h-5 w-5" />} color="amber" />
-        <StatCard title="Average Score" value={avgScore} icon={<Gamepad2 className="h-5 w-5" />} color="green" />
+        <StatCard title="Fastest Time" value={fastestTime != null ? `${fastestTime.toFixed(2).replace(".", ",")} s` : "-"} icon={<Clock className="h-5 w-5" />} color="amber" />
+        <StatCard title="Average Time" value={averageTime != null ? `${averageTime.toFixed(2).replace(".", ",")} s` : "-"} icon={<Clock className="h-5 w-5" />} color="green"/>
       </div>
 
       {processedTimeline.length > 0 && (
-        <div className="rounded-2xl overflow-hidden border border-[var(--color-border)] bg-card shadow-sm">
+        <div className="hidden rounded-2xl overflow-hidden border border-[var(--color-border)] bg-card shadow-sm">
           <div className="bg-muted px-6 pt-5 pb-0">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">

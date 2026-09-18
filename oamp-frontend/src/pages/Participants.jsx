@@ -182,21 +182,31 @@ export function Participants() {
           color="blue"
         />
         <StatMini
-          icon={<Trophy className="h-4 w-4" />}
-          label="Skor Tertinggi"
-          value={
-            participants.length > 0
-              ? Math.max(
-                  ...participants.filter((p) => p.score != null).map((p) => Math.round(p.score))
-                ) || "N/A"
-              : "N/A"
-          }
-          color="amber"
-        />
+        icon={<Trophy className="h-4 w-4" />}
+        label="Waktu Tercepat"
+        value={
+          (() => {
+            const times = participants
+              .filter((p) => p.total_time != null && Number(p.total_time) > 0)
+              .map((p) => Number(p.total_time));
+
+            if (times.length === 0) return "N/A";
+
+            const fastestTime = Math.min(...times);
+
+            return `${fastestTime.toFixed(2)} detik`;
+          })()
+        }
+        color="amber"
+      />
         <StatMini
-          icon={<Gamepad2 className="h-4 w-4" />}
+          icon={<Gamepad2 className="w-4 h-4" />}
           label="Sudah Bermain"
-          value={participants.filter((p) => p.score != null).length}
+          value={
+            participants.filter(
+              (p) => p.total_time != null && Number(p.total_time) > 0
+            ).length
+          }
           color="green"
         />
       </div>
@@ -264,7 +274,7 @@ export function Participants() {
                     <SortTh field="grade">Kelas</SortTh>
                     <SortTh field="age" className="text-center">Usia</SortTh>
                     <TableHead className="text-center">Gender</TableHead>
-                    <SortTh field="score" className="text-center">Skor</SortTh>
+                    <SortTh field="total_time" className="text-center">Waktu</SortTh>
                     <SortTh field="level_reached" className="text-center">Level</SortTh>
                     <TableHead className="text-center">Aksi</TableHead>
                     <SortTh field="created_at">Terdaftar</SortTh>
@@ -300,12 +310,14 @@ export function Participants() {
                         {p.gender || "—"}
                       </TableCell>
                       <TableCell className="text-center">
-                        {p.score != null ? (
-                          <span className="font-bold text-foreground">{Math.round(p.score)}</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
+                      {p.total_time != null ? (
+                        <span className="font-bold text-foreground">
+                          {Number(p.total_time).toFixed(2)} s
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                       <TableCell className="text-center">
                         {p.level_reached != null ? (
                           <span className="inline-flex items-center justify-center rounded-full w-7 h-7 bg-muted text-sm font-bold text-foreground">

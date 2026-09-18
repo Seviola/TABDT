@@ -37,11 +37,17 @@ export function Home() {
             BRAINBLOCK AI: Deteksi Dini, Proteksi Otak Maksimal!
           </p>
 
-          <div className="mt-7 sm:mt-10">
+          <div className="mt-7 sm:mt-10 flex flex-row items-center gap-4">
             <Link
               to="/register"
               className="inline-block px-6 sm:px-8 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition">
               Coba Sekarang
+            </Link>
+
+            <Link
+              to="/login"
+              className="inline-block px-6 sm:px-8 py-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition">
+              Login
             </Link>
           </div>
         </div>

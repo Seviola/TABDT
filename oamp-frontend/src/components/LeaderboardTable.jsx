@@ -32,17 +32,17 @@ const rankConfig = {
   },
 };
 
-function getScoreDisplay(row) {
-  const s = row.score ?? null;
-  return s != null ? Math.round(s) : null;
+function getTimeDisplay(row) {
+  const t = row.total_time ?? null;
+  return t != null ? Number(t) : null;
 }
 
-function getPointDiff(row, data, index) {
+function getTimeDiff(row, data, index) {
   if (index === 0) return null;
-  const currentScore = getScoreDisplay(row);
-  const prevScore = getScoreDisplay(data[index - 1]);
-  if (currentScore == null || prevScore == null) return null;
-  return currentScore - prevScore;
+  const currentTime = getTimeDisplay(row);
+  const prevTime = getTimeDisplay(data[index - 1]);
+  if (currentTime == null || prevTime == null) return null;
+  return currentTime - prevTime;
 }
 
 export function LeaderboardTable({ data, loading }) {
@@ -82,7 +82,7 @@ export function LeaderboardTable({ data, loading }) {
               rank={2}
               name={data[1].name}
               grade={data[1].grade}
-              score={getScoreDisplay(data[1])}
+              time={getTimeDisplay(data[1])}
               height="h-24"
               onClick={() => navigate(`/analytics/${data[1].uid || data[1].participant_id}`)}
             />
@@ -92,7 +92,7 @@ export function LeaderboardTable({ data, loading }) {
               rank={1}
               name={data[0].name}
               grade={data[0].grade}
-              score={getScoreDisplay(data[0])}
+              time={getTimeDisplay(data[0])}
               height="h-36"
               onClick={() => navigate(`/analytics/${data[0].uid || data[0].participant_id}`)}
             />
@@ -102,7 +102,7 @@ export function LeaderboardTable({ data, loading }) {
               rank={3}
               name={data[2].name}
               grade={data[2].grade}
-              score={getScoreDisplay(data[2])}
+              time={getTimeDisplay(data[2])}
               height="h-20"
               onClick={() => navigate(`/analytics/${data[2].uid || data[2].participant_id}`)}
             />
@@ -117,16 +117,16 @@ export function LeaderboardTable({ data, loading }) {
             <TableHead className="w-16 text-center">#</TableHead>
             <TableHead>Pemain</TableHead>
             <TableHead className="text-center">Kelas</TableHead>
-            <TableHead className="text-center">Skor</TableHead>
-            <TableHead className="text-center">Selisih</TableHead>
+            <TableHead className="text-center">waktu</TableHead>
+            <TableHead className="hidden text-center">Selisih Waktu</TableHead>
             <TableHead className="text-center">Level</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {data.map((row, index) => {
             const config = rankConfig[row.rank];
-            const score = getScoreDisplay(row);
-            const diff = getPointDiff(row, data, index);
+            const time = getTimeDisplay(row);
+            const diff = getTimeDiff(row, data, index);
 
             return (
               <TableRow
@@ -186,10 +186,10 @@ export function LeaderboardTable({ data, loading }) {
                     "font-black text-base tabular-nums",
                     row.rank <= 3 ? "text-foreground" : "text-muted-foreground"
                   )}>
-                    {score != null ? score : "—"}
+                    {time != null ? `${time.toFixed(2)} s` : "—"}
                   </span>
                 </TableCell>
-                <TableCell className="text-center">
+                <TableCell className="hidden text-center">
                   {diff != null ? (
                     <span className={cn(
                       "inline-flex items-center gap-0.5 text-xs font-bold",
@@ -220,7 +220,7 @@ export function LeaderboardTable({ data, loading }) {
   );
 }
 
-function PodiumSlot({ rank, name, grade, score, height, onClick }) {
+function PodiumSlot({ rank, name, grade, time, height, onClick }) {
   const colors = {
     1: {
       bg: "from-yellow-400 via-amber-400 to-orange-400",
@@ -266,10 +266,10 @@ function PodiumSlot({ rank, name, grade, score, height, onClick }) {
         )}
       >
         <span className={cn("text-3xl font-black tabular-nums", c.text)}>
-          {score ?? "—"}
+          {time != null ? `${time.toFixed(2)} s` : "—"}
         </span>
         <span className={cn("text-xs font-bold opacity-70", c.text)}>
-          pts
+          waktu
         </span>
       </div>
     </div>

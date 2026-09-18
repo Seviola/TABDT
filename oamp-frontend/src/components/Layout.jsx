@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useHealthCheck } from "@/hooks/useHealthCheck";
 import { useAdminMode } from "@/contexts/AdminModeContext";
 import { StatusBanner } from "@/components/StatusBanner";
@@ -12,13 +12,15 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Home, UserPlus, Download, LayoutDashboard, Users, Swords, Trophy, Shield, ShieldCheck, ShieldOff, Sun, Moon } from "lucide-react";
+import { Home, UserPlus, Download, LayoutDashboard, Users, Swords, Trophy, Shield, ShieldCheck, ShieldOff, Sun, Moon, LogOut, Eye, EyeOff, User, Lock, School } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/", label: "Home", icon: Home },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/participants", label: "Peserta", icon: Users },
+  { to: "/children", label: "Peserta", icon: Users },
+  { to: "/pendaftaran", label: "Daftar", icon: UserPlus },
   { to: "/tournaments", label: "Cup", icon: Trophy },
   { to: "/register", label: "Daftar", icon: UserPlus },
   { to: "/duel", label: "Duel", icon: Swords },
@@ -27,10 +29,24 @@ const navItems = [
 
 export function Layout() {
   const isOnline = useHealthCheck();
+  const currentUser = JSON.parse(
+    localStorage.getItem("currentUser") || "null"
+  );
+  const userRole = localStorage.getItem("role");
+  const userName = currentUser?.name || "Pengguna";
+  const userInitials = userName
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0].toUpperCase())
+    .join("");
   const location = useLocation();
+  const navigate = useNavigate();
   const { adminMode, showPinDialog, setShowPinDialog, attemptActivate, deactivate } = useAdminMode();
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === "undefined") return false;
     const stored = localStorage.getItem("theme");
@@ -50,6 +66,14 @@ export function Layout() {
       setPinError(true);
       setPin("");
     }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("currentUser");
+    localStorage.removeItem("role");
+    localStorage.removeItem("user");
+
+    navigate("/");
   }
 
   return (
@@ -76,7 +100,33 @@ export function Layout() {
 
             <div className="flex items-center gap-2 max-w-full">
               <nav className="flex items-center gap-1 bg-muted p-1.5 rounded-2xl border border-border shadow-sm max-w-full overflow-x-auto">
-                {navItems.map((item) => {
+                {navItems
+                  .filter((item) => {
+                  // Belum login → semua menu umum tetap tampil
+                  if (!userRole) {
+                    return item.to !== "/children";
+                  }
+
+                  // Setelah login → Home tidak ditampilkan
+                  if (item.to === "/") return false;
+
+                  // Guru 
+                  if (userRole === "guru") {
+                    return item.to !== "/participants" && item.to !== "/tournaments" && item.to !== "/register";
+                  }
+
+                  // Orang tua → Dashboard dan Anak
+                  if (userRole === "orang_tua") {
+                    return item.to === "/dashboard" || item.to === "/children";
+                  }
+
+                  // Admin → dapat melihat semua menu
+                  if (userRole === "admin") {
+                    return item.to !== "/children" && item.to !== "/pendaftaran";
+                  }
+                  return false;
+                })
+                  .map((item) => {
                   const isActive =
                     item.to === "/"
                       ? location.pathname === "/"
@@ -85,7 +135,11 @@ export function Layout() {
                   return (
                     <Link
                       key={item.to}
-                      to={item.to}
+                      to={
+                        item.to === "/dashboard" && userRole
+                          ? "/dashboard-role"
+                          : item.to
+                      }
                       className={cn(
                         "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition-all",
                         isActive
@@ -99,6 +153,27 @@ export function Layout() {
                   );
                 })}
               </nav>
+
+              {/* User Profile */}
+              {userRole && (
+                <button type="button" onClick={() => setProfileOpen(true)} className="h-9 w-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold border border-border shadow-sm hover:opacity-90 transition-opacity" title="Profil">
+                  {userInitials}
+                </button>
+              )}
+
+              {/* Logout */}
+              {userRole && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50"
+                  onClick={handleLogout}
+                  title="Keluar dari akun"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
+              )}
 
               {/* Dark/Light toggle */}
               <button
@@ -148,6 +223,145 @@ export function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Profile Dialog */}
+      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-2xl">
+
+          {/* Header Profile */}
+          <div className="bg-gradient-to-r from-red-600 to-red-500 px-6 pt-7 pb-8">
+            <DialogHeader>
+              <div className="flex items-center gap-4">
+
+                {/* Avatar */}
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white text-red-600 text-2xl font-bold shadow-md">
+                  {(currentUser?.name || "U").charAt(0).toUpperCase()}
+                </div>
+
+                {/* Nama dan Username */}
+                <div className="text-white min-w-0">
+                  <DialogTitle className="text-xl font-bold text-white">
+                    {currentUser?.name || "-"}
+                  </DialogTitle>
+
+                  <p className="text-sm text-white/80 mt-1">
+                    @{currentUser?.username || "-"}
+                  </p>
+
+                  {/* Role Badge */}
+                  <span className="inline-flex mt-2 rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white">
+                    {currentUser?.role === "orang_tua"
+                      ? "Orang Tua"
+                      : currentUser?.role === "guru"
+                        ? "Guru"
+                        : currentUser?.role || "-"}
+                  </span>
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
+
+          {/* Profile Information */}
+          <div className="px-6 py-6 space-y-3">
+
+            {/* Sekolah */}
+            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                <School className="h-5 w-5" />
+              </div>
+
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">
+                  Sekolah
+                </p>
+
+                <p className="text-sm font-semibold text-foreground truncate">
+                  {currentUser?.school?.name || "-"}
+                </p>
+              </div>
+            </div>
+
+            {/* Username */}
+            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                <User className="h-5 w-5" />
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  Username
+                </p>
+
+                <p className="text-sm font-semibold text-foreground">
+                  {currentUser?.username || "-"}
+                </p>
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                <Lock className="h-5 w-5" />
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">
+                  Password
+                </p>
+
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-foreground">
+                    {showPassword
+                      ? currentUser?.password || "-"
+                      : "••••••••"}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-muted-foreground hover:text-red-600 transition-colors"
+                    title={
+                      showPassword
+                        ? "Sembunyikan password"
+                        : "Lihat password"
+                    }
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-5 w-5" />
+                    ) : (
+                      <Eye className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Role */}
+            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  Role
+                </p>
+
+                <p className="text-sm font-semibold text-foreground">
+                  {currentUser?.role === "orang_tua"
+                    ? "Orang Tua"
+                    : currentUser?.role === "guru"
+                      ? "Guru"
+                      : currentUser?.role || "-"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* PIN Dialog */}
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
