@@ -1,6 +1,7 @@
 package route
 
 import (
+	"net/http"
 	"os"
 	"strings"
 	"oamp-backend/internal/controller"
@@ -69,6 +70,19 @@ func SetupRoutes(r *gin.Engine) {
 
 	api := r.Group("/api/v1")
 	{
+		// Authentication
+		api.POST("/auth/registerParticipant", controller.Register)
+		api.POST("/auth/login", controller.Login)
+
+		api.GET("/auth/me", middleware.AuthRequired(), func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"user_id":  c.MustGet("user_id"),
+				"username": c.MustGet("username"),
+				"role":     c.MustGet("role"),
+				"school_id": c.MustGet("school_id"),
+			})
+		})
+
 		// Participant registration
 		api.POST("/participants", controller.RegisterParticipant)
 		api.GET("/participants", controller.GetParticipants)
@@ -83,6 +97,7 @@ func SetupRoutes(r *gin.Engine) {
 		// Leaderboard
 		api.GET("/leaderboard", controller.GetLeaderboard)
 		api.GET("/leaderboard/timeline", controller.GetLeaderboardTimeline)
+		api.GET("/leaderboard/time-stats", controller.GetLeaderboardTimeStats)
 
 		// Export
 		api.GET("/export/excel", controller.ExportExcel)

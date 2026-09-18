@@ -42,6 +42,11 @@ type TimelineEntry struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type TimeStats struct {
+	FastestTime  float64 `json:"fastest_time"`
+	AverageTime  float64 `json:"average_time"`
+}
+
 func fetchLeaderboard(limit int, batchID *uint, mode string) []LeaderboardEntry {
 	query := `
         SELECT
@@ -169,4 +174,59 @@ func GetLeaderboardTimeline(c *gin.Context) {
 	var entries []TimelineEntry
 	config.DB.Raw(query, args...).Scan(&entries)
 	response.OKWithMessage(c, "Timeline fetched successfully", entries)
+}
+
+func GetLeaderboardTimeStats(c *gin.Context) {
+	idStr := c.Query("batch_id")
+	mode := c.Query("mode")
+
+	var args []any
+	var conditions []string
+
+	query := `
+		SELECT
+			COALESCE(MIN(gs.total_time), 0) AS fastest_time,
+			COALESCE(AVG(gs.total_time), 0) AS average_time
+		FROM game_sessions gs `
+
+	if idStr != "" && idStr != "all" {
+		var id uint
+		if _, err := parseUint(idStr, &id); err == nil {
+			conditions = append(conditions, "gs.event_batch_id = ?")
+			args = append(args, id)
+		} else {
+			response.OKWithMessage(c, "Time stats fetched successfully", TimeStats{})
+			return
+		}
+	} else if idStr != "all" {
+		var activeID uint
+
+		if err := config.DB.
+			Model(&model.EventBatch{}).
+			Where("is_active = ?", true).
+			Select("id").
+			First(&activeID).Error; err != nil {
+
+			response.OKWithMessage(c, "Time stats fetched successfully", TimeStats{})
+			return
+		}
+
+		conditions = append(conditions, "gs.event_batch_id = ?")
+		args = append(args, activeID)
+	}
+
+	if mode != "" {
+		conditions = append(conditions, "gs.mode = ?")
+		args = append(args, mode)
+	}
+
+	conditions = append(conditions, "gs.total_time > 0")
+
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	var stats TimeStats
+	config.DB.Raw(query, args...).Scan(&stats)
+	response.OKWithMessage(c, "Time stats fetched successfully", stats)
 }
