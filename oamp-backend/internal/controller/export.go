@@ -20,7 +20,14 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-func ExportExcel(c *gin.Context) {
+func ExportExcel(c *gin.Context) {	
+	where, args, ok := getExportFilter(c)
+	if !ok {
+		response.Error(c, http.StatusForbidden, "Akun tidak memiliki akses export")
+		return
+	}
+
+	log.Printf("[export-excel] filter=%s args=%v", where, args)
 	f := excelize.NewFile()
 	defer f.Close()
 
@@ -39,7 +46,36 @@ func ExportExcel(c *gin.Context) {
 	}
 	f.SetCellStyle(sheetLeaderboard, "A1", fmt.Sprintf("%c1", 'A'+len(lbHeaders)-1), headerStyle)
 
-	entries := fetchLeaderboard(0, nil, "")
+	var leaderboardSchoolID *uint
+
+	roleValue, roleExists := c.Get("role")
+	schoolValue, schoolExists := c.Get("school_id")
+
+	if roleExists {
+		role, _ := roleValue.(string)
+
+		if role == "admin" {
+			// 0 = semua data sekolah, bukan data umum
+			adminSchoolID := uint(0)
+			leaderboardSchoolID = &adminSchoolID
+		} else if (role == "guru" || role == "orang_tua") && schoolExists && schoolValue != nil {
+			switch id := schoolValue.(type) {
+			case float64:
+				schoolID := uint(id)
+				leaderboardSchoolID = &schoolID
+			case uint:
+				leaderboardSchoolID = &id
+			case int:
+				schoolID := uint(id)
+				leaderboardSchoolID = &schoolID
+			case int64:
+				schoolID := uint(id)
+				leaderboardSchoolID = &schoolID
+			}
+		}
+	}
+
+	entries := fetchLeaderboard(0, nil, "", leaderboardSchoolID)
 	for i, e := range entries {
 		row := i + 2
 		f.SetCellValue(sheetLeaderboard, fmt.Sprintf("A%d", row), e.Rank)
@@ -66,7 +102,14 @@ func ExportExcel(c *gin.Context) {
 	f.SetCellStyle(sheetParticipants, "A1", fmt.Sprintf("%c1", 'A'+len(pHeaders)-1), headerStyle)
 
 	var participants []model.Participant
-	config.DB.Order("id asc").Find(&participants)
+	if err := config.DB.
+		Where(where, args...).
+		Order("id asc").
+		Find(&participants).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Gagal mengambil data peserta")
+		return
+	}
+	log.Printf("[export-excel] participants filtered=%d", len(participants))
 
 	for i, p := range participants {
 		row := i + 2
@@ -94,7 +137,21 @@ func ExportExcel(c *gin.Context) {
 	f.SetCellStyle(sheetSessions, "A1", fmt.Sprintf("%c1", 'A'+len(sHeaders)-1), headerStyle)
 
 	var sessions []model.GameSession
-	config.DB.Order("id asc").Find(&sessions)
+		if len(participants) > 0 {
+		participantIDs := make([]uint, 0, len(participants))
+
+		for _, participant := range participants {
+			participantIDs = append(participantIDs, participant.ID)
+		}
+
+		if err := config.DB.
+			Where("participant_id IN ?", participantIDs).
+			Order("id asc").
+			Find(&sessions).Error; err != nil {
+			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data sesi")
+			return
+		}
+	}
 
 	for i, s := range sessions {
 		row := i + 2
@@ -122,7 +179,21 @@ func ExportExcel(c *gin.Context) {
 	f.SetCellStyle(sheetResults, "A1", fmt.Sprintf("%c1", 'A'+len(rHeaders)-1), headerStyle)
 
 	var results []model.GameResult
-	config.DB.Order("created_at desc").Find(&results)
+	participantUIDs := make([]string, 0, len(participants))
+
+	for _, participant := range participants {
+		participantUIDs = append(participantUIDs, participant.UID)
+	}
+
+	if len(participantUIDs) > 0 {
+		if err := config.DB.
+			Where("uid IN ?", participantUIDs).
+			Order("created_at desc").
+			Find(&results).Error; err != nil {
+			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data hasil permainan")
+			return
+		}
+	}
 
 	for i, r := range results {
 		row := i + 2
@@ -162,7 +233,35 @@ func ExportExcel(c *gin.Context) {
 }
 
 func ExportPDF(c *gin.Context) {
-	entries := fetchLeaderboard(0, nil, "")
+	var leaderboardSchoolID *uint
+
+	roleValue, roleExists := c.Get("role")
+	schoolValue, schoolExists := c.Get("school_id")
+
+	if roleExists {
+		role, _ := roleValue.(string)
+
+		if role == "admin" {
+			adminSchoolID := uint(0)
+			leaderboardSchoolID = &adminSchoolID
+		} else if (role == "guru" || role == "orang_tua") && schoolExists && schoolValue != nil {
+			switch id := schoolValue.(type) {
+			case float64:
+				schoolID := uint(id)
+				leaderboardSchoolID = &schoolID
+			case uint:
+				leaderboardSchoolID = &id
+			case int:
+				schoolID := uint(id)
+				leaderboardSchoolID = &schoolID
+			case int64:
+				schoolID := uint(id)
+				leaderboardSchoolID = &schoolID
+			}
+		}
+	}
+
+	entries := fetchLeaderboard(0, nil, "", leaderboardSchoolID)
 
 	pdf := gofpdf.New("L", "mm", "A4", "")
 	pdf.AddPage()
@@ -441,8 +540,8 @@ func ifPositive(value float64, format, fallback string) string {
 
 // ExportCSV — GET /api/v1/export/csv — downloadable ZIP of all data tables as CSV
 func ExportCSV(c *gin.Context) {
-	f := excelize.NewFile()
-	defer f.Close()
+        f := excelize.NewFile()
+        defer f.Close()
 
 	// Sheet: GameResults (raw per-level data)
 	f.SetSheetName("Sheet1", "GameResults")
@@ -451,8 +550,43 @@ func ExportCSV(c *gin.Context) {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue("GameResults", cell, h)
 	}
+	where, args, ok := getExportFilter(c)
+	if !ok {
+		response.Error(c, http.StatusForbidden, "Akun tidak memiliki akses export")
+		return
+	}
+
+	log.Printf("[export-csv] filter=%s args=%v", where, args)
+
+	var participants []model.Participant
+	if err := config.DB.
+		Where(where, args...).
+		Order("id asc").
+		Find(&participants).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Gagal mengambil data peserta")
+		return
+	}
+
+	participantUIDs := make([]string, 0, len(participants))
+	for _, participant := range participants {
+		participantUIDs = append(participantUIDs, participant.UID)
+	}
+
 	var results []model.GameResult
-	config.DB.Order("created_at desc").Find(&results)
+	if len(participantUIDs) > 0 {
+		if err := config.DB.
+			Where("uid IN ?", participantUIDs).
+			Order("created_at desc").
+			Find(&results).Error; err != nil {
+			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data hasil permainan")
+			return
+		}
+	}
+
+	log.Printf("[export-csv] participants filtered=%d, results filtered=%d",
+		len(participants),
+		len(results),
+	)
 	for i, r := range results {
 		row := i + 2
 		varJSON, _ := json.Marshal(r.VariantList)
@@ -487,7 +621,22 @@ func ExportCSV(c *gin.Context) {
 		f.SetCellValue("Sessions", cell, h)
 	}
 	var sessions []model.GameSession
-	config.DB.Order("id asc").Find(&sessions)
+	participantIDs := make([]uint, 0, len(participants))
+	for _, participant := range participants {
+		participantIDs = append(participantIDs, participant.ID)
+	}
+
+	if len(participantIDs) > 0 {
+		if err := config.DB.
+			Where("participant_id IN ?", participantIDs).
+			Order("id asc").
+			Find(&sessions).Error; err != nil {
+			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data sesi")
+			return
+		}
+	}
+
+	log.Printf("[export-csv] sessions filtered=%d", len(sessions))
 	for i, s := range sessions {
 		row := i + 2
 		f.SetCellValue("Sessions", fmt.Sprintf("A%d", row), s.ID)
@@ -532,8 +681,44 @@ func SendExportToTelegram(c *gin.Context) {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue("GameResults", cell, h)
 	}
+	where, args, ok := getExportFilter(c)
+	if !ok {
+		response.Error(c, http.StatusForbidden, "Akun tidak memiliki akses export")
+		return
+	}
+
+	log.Printf("[export-telegram] filter=%s args=%v", where, args)
+
+	var participants []model.Participant
+	if err := config.DB.
+		Where(where, args...).
+		Order("id asc").
+		Find(&participants).Error; err != nil {
+		response.Error(c, http.StatusInternalServerError, "Gagal mengambil data peserta")
+		return
+	}
+
+	participantUIDs := make([]string, 0, len(participants))
+	for _, participant := range participants {
+		participantUIDs = append(participantUIDs, participant.UID)
+	}
+
 	var results []model.GameResult
-	config.DB.Order("created_at desc").Find(&results)
+	if len(participantUIDs) > 0 {
+		if err := config.DB.
+			Where("uid IN ?", participantUIDs).
+			Order("created_at desc").
+			Find(&results).Error; err != nil {
+			response.Error(c, http.StatusInternalServerError, "Gagal mengambil data hasil permainan")
+			return
+		}
+	}
+
+	log.Printf(
+		"[export-telegram] participants filtered=%d, results filtered=%d",
+		len(participants),
+		len(results),
+	)
 	for i, r := range results {
 		row := i + 2
 		varJSON, _ := json.Marshal(r.VariantList)
@@ -594,4 +779,63 @@ func getEnv(key, def string) string {
 		return v
 	}
 	return def
+}
+
+func getExportFilter(c *gin.Context) (string, []interface{}, bool) {
+	roleValue, roleExists := c.Get("role")
+	schoolValue, schoolExists := c.Get("school_id")
+
+	role, _ := roleValue.(string)
+
+	log.Printf(
+		"[export-filter] role=%v roleExists=%v school_id=%v schoolExists=%v",
+		role,
+		roleExists,
+		schoolValue,
+		schoolExists,
+	)
+
+	// Tanpa role
+	if !roleExists || role == "" {
+		return "school_id IS NULL", nil, true
+	}
+
+	// Admin = semua data sekolah, tidak dengan data umum
+	if role == "admin" {
+		return "school_id IS NOT NULL", nil, true
+	}
+
+	// Guru dan orang tua = hanya sekolah dari akun tersebut
+	if role == "guru" || role == "orang_tua" {
+		if !schoolExists || schoolValue == nil {
+			log.Printf("[export-filter] %s tidak memiliki school_id", role)
+			return "", nil, false
+		}
+
+		switch id := schoolValue.(type) {
+		case float64:
+			return "school_id = ?", []interface{}{uint(id)}, true
+
+		case uint:
+			return "school_id = ?", []interface{}{id}, true
+
+		case int:
+			return "school_id = ?", []interface{}{uint(id)}, true
+
+		case int64:
+			return "school_id = ?", []interface{}{uint(id)}, true
+
+		default:
+			log.Printf(
+				"[export-filter] tipe school_id tidak dikenali: %T (%v)",
+				schoolValue,
+				schoolValue,
+			)
+			return "", nil, false
+		}
+	}
+
+	// Role tidak dikenal
+	log.Printf("[export-filter] role tidak dikenal: %v", role)
+	return "", nil, false
 }

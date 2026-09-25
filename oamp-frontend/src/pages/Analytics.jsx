@@ -1,4 +1,4 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import ReactMarkdown from "react-markdown";
@@ -44,6 +44,7 @@ import { toast } from "sonner";
 
 export function Analytics() {
   const { uid } = useParams();
+  const navigate = useNavigate();
   const [downloadingRapor, setDownloadingRapor] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -214,12 +215,10 @@ export function Analytics() {
         </div>
         <h2 className="text-xl font-semibold text-foreground">Peserta tidak ditemukan</h2>
         <p className="text-muted-foreground">UID &quot;{uid}&quot; tidak terdaftar di sistem.</p>
-        <Button asChild variant="outline">
-          <Link to="/">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Kembali ke Dashboard
-          </Link>
-        </Button>
+        <Button variant="outline" onClick={() => navigate(-1)}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+            Kembali
+          </Button>
       </div>
     );
   }
@@ -267,14 +266,21 @@ export function Analytics() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button asChild variant="ghost" size="icon">
-            <Link to="/">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+          >
+            <ArrowLeft className="h-5 w-5" />
           </Button>
+
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Detail Peserta</h1>
-            <p className="text-sm text-muted-foreground">Data performa dan hasil assessment</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Detail Peserta
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Data performa dan hasil assessment
+            </p>
           </div>
         </div>
         <Button

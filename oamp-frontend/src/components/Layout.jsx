@@ -20,6 +20,7 @@ const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/participants", label: "Peserta", icon: Users },
   { to: "/children", label: "Peserta", icon: Users },
+  { to: "/schools", label: "Sekolah", icon: School },
   { to: "/pendaftaran", label: "Daftar", icon: UserPlus },
   { to: "/tournaments", label: "Cup", icon: Trophy },
   { to: "/register", label: "Daftar", icon: UserPlus },
@@ -72,6 +73,7 @@ export function Layout() {
     localStorage.removeItem("currentUser");
     localStorage.removeItem("role");
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
 
     navigate("/");
   }
@@ -102,30 +104,55 @@ export function Layout() {
               <nav className="flex items-center gap-1 bg-muted p-1.5 rounded-2xl border border-border shadow-sm max-w-full overflow-x-auto">
                 {navItems
                   .filter((item) => {
-                  // Belum login → semua menu umum tetap tampil
-                  if (!userRole) {
-                    return item.to !== "/children";
-                  }
+                    // BELUM LOGIN
+                    // Tampilkan halaman umum, termasuk /participants
+                    if (!userRole) {
+                      return (
+                        item.to !== "/children" &&
+                        item.to !== "/pendaftaran" &&
+                        item.to !== "/schools"
+                      );
+                    }
 
-                  // Setelah login → Home tidak ditampilkan
-                  if (item.to === "/") return false;
+                    // SUDAH LOGIN
+                    // Menu Sekolah hanya untuk ADMIN
+                    if (item.to === "/schools" && userRole !== "admin") {
+                      return false;
+                    }
+                    // Jangan tampilkan menu umum /participants
+                    if (item.to === "/participants") {
+                      return false;
+                    }
 
-                  // Guru 
-                  if (userRole === "guru") {
-                    return item.to !== "/participants" && item.to !== "/tournaments" && item.to !== "/register";
-                  }
+                    // Home tidak ditampilkan setelah login
+                    if (item.to === "/") {
+                      return false;
+                    }
 
-                  // Orang tua → Dashboard dan Anak
-                  if (userRole === "orang_tua") {
-                    return item.to === "/dashboard" || item.to === "/children";
-                  }
+                    // GURU
+                    if (userRole === "guru") {
+                      return (
+                        item.to !== "/tournaments" &&
+                        item.to !== "/register"
+                      );
+                    }
 
-                  // Admin → dapat melihat semua menu
-                  if (userRole === "admin") {
-                    return item.to !== "/children" && item.to !== "/pendaftaran";
-                  }
-                  return false;
-                })
+                    // ORANG TUA
+                    if (userRole === "orang_tua") {
+                      return (
+                        item.to === "/dashboard" ||
+                        item.to === "/children"
+                      );
+                    }
+
+                    // ADMIN
+                    if (userRole === "admin") {
+                      return item.to !== "/pendaftaran"&&
+                             item.to !== "/register"
+                    }
+
+                    return false;
+                  })
                   .map((item) => {
                   const isActive =
                     item.to === "/"
@@ -265,7 +292,7 @@ export function Layout() {
           <div className="px-6 py-6 space-y-3">
 
             {/* Sekolah */}
-            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
                 <School className="h-5 w-5" />
               </div>
@@ -282,7 +309,7 @@ export function Layout() {
             </div>
 
             {/* Username */}
-            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
                 <User className="h-5 w-5" />
               </div>
@@ -299,7 +326,7 @@ export function Layout() {
             </div>
 
             {/* Password */}
-            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
 
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
                 <Lock className="h-5 w-5" />
@@ -339,7 +366,7 @@ export function Layout() {
             </div>
 
             {/* Role */}
-            <div className="flex items-center gap-4 rounded-xl border bg-gray-50 px-4 py-3">
+            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
 
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
                 <ShieldCheck className="h-5 w-5" />

@@ -13,7 +13,7 @@ export function Home() {
       />
 
       {/* Overlay putih  */}
-      <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/10"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-white via-white/90 to-white/10 dark:from-background dark:via-background/90 dark:to-background/10"></div>
 
       {/* Content */}
       <div className="relative w-full px-5 sm:px-8 md:px-12 lg:px-16">
@@ -21,15 +21,15 @@ export function Home() {
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-4 leading-tight flex flex-wrap items-baseline gap-2 sm:gap-3">
             <span className="text-red-600">BRAINBLOCK</span>
-            <span className="text-black">AI</span>
+            <span className="text-foreground">AI</span>
           </h1>
 
-          <p className="mt-5 sm:mt-6 text-gray-700 text-base sm:text-lg leading-7 sm:leading-9">
+          <p className="mt-5 sm:mt-6 text-muted-foreground text-base sm:text-lg leading-7 sm:leading-9">
             <span className="text-red-600 font-bold text-lg sm:text-xl lg:text-2xl">
               Sering Hilang Fokus dan Gampang Lupa?
             </span>{" "}
             <br />
-            <span className="text-black font-bold text-lg sm:text-xl lg:text-2xl">
+            <span className="text-foreground font-bold text-lg sm:text-xl lg:text-2xl">
             Jangan-jangan Otakmu Kena Brainrot!
             </span>
             <br />
@@ -54,7 +54,7 @@ export function Home() {
       </div>
     </section>
 
-    <section className="py-16 sm:py-20 lg:py-24 bg-gray-50">
+    <section className="py-16 sm:py-20 lg:py-24 bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
 
         {/* Judul */}
@@ -62,7 +62,7 @@ export function Home() {
           <h2 className="text-3xl sm:text-4xl font-bold mt-3 text-red-600">
             BRAINBLOCK AI
           </h2>
-          <p className="mt-5 text-gray-600 max-w-3xl mx-auto text-base sm:text-lg leading-7 sm:leading-8 px-2">
+          <p className="mt-5 text-muted-foreground max-w-3xl mx-auto text-base sm:text-lg leading-7 sm:leading-8 px-2">
           Novasi Deteksi Dini Kemampuan Kognitif Melalui Media Permainan Interaktif Berbasis AI
           </p>
         </div>
@@ -70,29 +70,29 @@ export function Home() {
         {/* Card */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
 
-          <div className="bg-white rounded-2xl p-8 shadow-sm border-2 border-transparent hover:border-red-600 hover:shadow-lg transition">
+          <div className="bg-card rounded-2xl p-8 shadow-sm border-2 border-border hover:border-red-600 hover:shadow-lg transition">
             <h3 className="text-2xl font-semibold mb-4 text-center">
             Instrumen Fisik
             </h3>
-            <p className="text-gray-600 leading-7 text-justify">
+            <p className="text-muted-foreground leading-7 text-justify">
             Menggunakan set Balok Merah Putih (Block Design Test) sebagai media tes interaktif untuk merangsang ketangkasan visual, fokus, dan pemecahan masalah secara nyata
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 shadow-sm border-2 border-transparent hover:border-red-600 hover:shadow-lg transition">
+          <div className="bg-card rounded-2xl p-8 shadow-sm border-2 border-border hover:border-red-600 hover:shadow-lg transition">
             <h3 className="text-2xl font-semibold mb-4 text-center">
             Stimulasi Otak
             </h3>
-            <p className="text-gray-600 leading-7 text-justify">
+            <p className="text-muted-foreground leading-7 text-justify">
             Melalui tantangan menyusun pola balok, metode ini dirancang untuk merangsang logika berpikir kritis, pemecahan masalah, dan daya ingat secara aktif
             </p>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 shadow-sm border-2 border-transparent hover:border-red-600 hover:shadow-lg transition">
+          <div className="bg-card rounded-2xl p-8 shadow-sm border-2 border-border hover:border-red-600 hover:shadow-lg transition">
             <h3 className="text-2xl font-semibold mb-4 text-center">
             Analitik Cerdas
             </h3>
-            <p className="text-gray-600 leading-7 text-justify">
+            <p className="text-muted-foreground leading-7 text-justify">
             Mengenalkan teknologi AI yang mengolah data performa peserta permainan untuk memberikan wawasan kognitif secara visual serta membantu deteksi dini potensi masalah kognitif
             </p>
           </div>
@@ -109,14 +109,14 @@ export function Home() {
       className="absolute inset-0 w-full h-full object-cover object-center lg:object-center"/>
 
     {/* Overlay */}
-    <div className="absolute inset-0 bg-gradient-to-l from-white via-white/90 to-white/10"></div>
+    <div className="absolute inset-0 bg-gradient-to-l from-white via-white/90 to-white/10 dark:from-background dark:via-background/90 dark:to-background/10"></div>
 
     {/* Content */}
     <div className="relative w-full px-5 sm:px-8 md:px-12 lg:px-16 flex justify-center lg:justify-end">
       <div className="max-w-xl">
         <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mt-4 leading-tight">
         Balok <span className="text-red-600">Merah</span> Putih</h2>
-        <p className="mt-5 sm:mt-6 text-gray-700 text-base sm:text-lg leading-7 sm:leading-9">
+        <p className="mt-5 sm:mt-6 text-muted-foreground text-base sm:text-lg leading-7 sm:leading-9">
         Balok Merah Putih merupakan media utama dalam permainan
         BRAINBLOCK AI. Dengan menyusun balok sesuai pola yang diberikan,
         pengguna dapat melatih kemampuan visual, konsentrasi,
@@ -128,7 +128,7 @@ export function Home() {
             <div>
               <h3 className="font-semibold text-lg sm:text-xl">
                 Produk Food Grade</h3>
-              <p className="text-gray-600 text-sm sm:text-base leading-6">
+              <p className="text-muted-foreground text-sm sm:text-base leading-6">
               Balok aman dan tidak mengandung zat kimia berbahaya.</p>
             </div>
           </div>
@@ -140,7 +140,7 @@ export function Home() {
               Material Kayu Berkualitas
               </h3>
 
-              <p className="text-gray-600">
+              <p className="text-muted-foreground text-muted-foreground">
                 Sentuhan alami kayu pilihan yang halus dan tidak tajam.</p>
             </div>
           </div>
@@ -152,7 +152,7 @@ export function Home() {
               Nyaman Digunakan
               </h3>
 
-              <p className="text-gray-600 leading-7">
+              <p className="text-muted-foreground leading-7">
               Desain ergonomis yang nyaman digenggam dan dimainkan</p>
 
             </div>

@@ -22,6 +22,7 @@ import { EventDisplay } from "@/pages/EventDisplay";
 import { Home } from "@/pages/Home";
 import { Login } from "@/pages/Login";
 import { RegisterParticipant } from "@/pages/RegisterParticipant";
+import { Schools } from "@/pages/Schools";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,10 +62,11 @@ function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard-role" element={<DashboardRole />} />
                 <Route path="/admin" element={ <RoleRoute allowedRoles={["guru"]}> <Admin />  </RoleRoute> }/>
+                <Route path="/schools" element={ <RoleRoute allowedRoles={["admin"]}> <Schools /> </RoleRoute> }/>
                 <Route path="/participants" element={<Participants />} />
                 <Route path="/children" element={<Children />} />
                 <Route path="/register" element={<Register />} />
-                <Route path="/pendaftaran" element={<Pendaftaran />} />
+                <Route path="/pendaftaran" element={<RoleRoute allowedRoles={["guru"]}> <Pendaftaran /> </RoleRoute>}/>
                 <Route path="/paywall/:uid" element={<Paywall />} />
                 <Route path="/analytics/:uid" element={<Analytics />} />
                 <Route path="/export" element={<Export />} />

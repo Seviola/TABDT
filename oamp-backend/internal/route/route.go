@@ -83,10 +83,14 @@ func SetupRoutes(r *gin.Engine) {
 			})
 		})
 
+		// Schools
+		api.GET("/schools", middleware.AuthRequired(), controller.GetSchools)
+		api.POST("/admin/schools/:id/reset-participants", middleware.AuthRequired(), controller.ResetSchoolParticipants,)
+
 		// Participant registration
-		api.POST("/participants", controller.RegisterParticipant)
-		api.GET("/participants", controller.GetParticipants)
-		api.GET("/participants/stats", controller.GetParticipantsWithScores)
+		api.POST("/participants", middleware.OptionalAuth(), controller.RegisterParticipant)
+		api.GET("/participants", middleware.OptionalAuth(), controller.GetParticipants)
+		api.GET("/participants/stats", middleware.OptionalAuth(), controller.GetParticipantsWithScores)
 		api.GET("/participants/id/:id", controller.GetParticipantByID)
 		api.DELETE("/participants/:id", controller.DeleteParticipant)
 		api.GET("/participants/lookup/:nickname", controller.LookupParticipant)
@@ -95,16 +99,16 @@ func SetupRoutes(r *gin.Engine) {
 		api.PUT("/participants/uid/:uid", controller.UpdateParticipant)
 
 		// Leaderboard
-		api.GET("/leaderboard", controller.GetLeaderboard)
-		api.GET("/leaderboard/timeline", controller.GetLeaderboardTimeline)
-		api.GET("/leaderboard/time-stats", controller.GetLeaderboardTimeStats)
+		api.GET("/leaderboard", middleware.OptionalAuth(), controller.GetLeaderboard)
+		api.GET("/leaderboard/timeline", middleware.OptionalAuth(), controller.GetLeaderboardTimeline)
+		api.GET("/leaderboard/time-stats", middleware.OptionalAuth(), controller.GetLeaderboardTimeStats)
 
 		// Export
-		api.GET("/export/excel", controller.ExportExcel)
-		api.GET("/export/pdf", controller.ExportPDF)
+		api.GET("/export/excel", middleware.OptionalAuth(), controller.ExportExcel)
+		api.GET("/export/pdf", middleware.OptionalAuth(), controller.ExportPDF)
 		api.GET("/export/rapor/:uid", controller.ExportRapor)
-		api.GET("/export/csv", controller.ExportCSV)
-		api.POST("/export/telegram", controller.SendExportToTelegram)
+		api.GET("/export/csv", middleware.OptionalAuth(), controller.ExportCSV)
+		api.POST("/export/telegram", middleware.OptionalAuth(), controller.SendExportToTelegram)
 
 		// Event Batch management
 		api.GET("/batches", controller.GetBatches)

@@ -49,28 +49,64 @@ export function Children() {
       return null;
     }
   }, []);
-
+  
   const userSchool = currentUser?.school?.name || "";
   const [search, setSearch] = useState("");
+  const role = currentUser?.role || "";
+  const isAdmin = role === "admin";
   const [sortField, setSortField] = useState("name");
   const [sortDir, setSortDir] = useState("asc");
   const [downloadingRapor, setDownloadingRapor] = useState({});
   const [deleting, setDeleting] = useState({});
   const [selectedBatch, setSelectedBatch] = useState("all");
+  const [selectedSchool, setSelectedSchool] = useState("all");
 
   const { data: batchesRes } = useQuery({
     queryKey: ["batches"],
     queryFn: () => api.get("/batches"),
   });
 
-  const allBatches = useMemo(() => batchesRes?.data || [], [batchesRes]);
+  const { data: schoolsRes } = useQuery({
+    queryKey: ["schools"],
+    queryFn: () => api.get("/schools"),
+    enabled: isAdmin,
+  });
+
+  const schools = useMemo(
+    () => schoolsRes?.data || [],
+    [schoolsRes]
+  );
+
+  const allBatches = useMemo(() => {
+    const batches = batchesRes?.data || [];
+
+    if (!isAdmin || selectedSchool === "all") {
+      return batches;
+    }
+
+    return batches.filter(
+      (b) => String(b.school_id) === String(selectedSchool)
+    );
+  }, [batchesRes, isAdmin, selectedSchool]);
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["participants", selectedBatch],
+    queryKey: ["participants", selectedBatch, selectedSchool],
     staleTime: 0,
     queryFn: async () => {
-      const params = selectedBatch !== "all" ? { params: { batch_id: selectedBatch } } : {};
-      const res = await api.get("/participants/stats", params);
+      const params = {};
+
+      if (selectedBatch !== "all") {
+        params.batch_id = selectedBatch;
+      }
+
+      if (isAdmin && selectedSchool !== "all") {
+        params.school_id = selectedSchool;
+      }
+
+      const res = await api.get("/participants/stats", {
+        params,
+      });
+
       return res.data;
     },
     select: (raw) => {
@@ -80,6 +116,7 @@ export function Children() {
         uid: p.uid,
         name: p.name,
         grade: p.grade,
+        school_name: p.school_name || "",
         age: p.age,
         gender: p.gender || null,
         created_at: p.created_at || null,
@@ -225,6 +262,7 @@ export function Children() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative max-w-sm flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+
           <Input
             placeholder="Cari nama, UID, atau kelas..."
             value={search}
@@ -232,21 +270,58 @@ export function Children() {
             className="pl-9 bg-white border border-[var(--color-border)] shadow-sm rounded-xl"
           />
         </div>
-        <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-          <SelectTrigger className="w-[200px] bg-white border border-[var(--color-border)] shadow-sm rounded-xl">
-            <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Semua Sesi" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Sesi</SelectItem>
-            {allBatches.map((b) => (
-              <SelectItem key={b.id} value={String(b.id)}>
-                {b.name}
-                {!b.is_active && " (arsip)"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        {isAdmin && (
+          <>
+            {/* Pilih Sekolah */}
+            <Select
+              value={selectedSchool}
+              onValueChange={(value) => {
+                setSelectedSchool(value);
+                setSelectedBatch("all");
+              }}
+            >
+              <SelectTrigger className="w-[220px] bg-white border border-[var(--color-border)] shadow-sm rounded-xl">
+                <SelectValue placeholder="Pilih Sekolah" />
+              </SelectTrigger>
+
+              <SelectContent>
+                <SelectItem value="all">Semua Sekolah</SelectItem>
+
+                {schools.map((school) => (
+                  <SelectItem
+                    key={school.id}
+                    value={String(school.id)}
+                  >
+                    {school.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Pilih Sesi */}
+            <Select
+              value={selectedBatch}
+              onValueChange={setSelectedBatch}
+            >
+              {/* <SelectTrigger className="w-[200px] bg-white border border-[var(--color-border)] shadow-sm rounded-xl">
+                <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Semua Sesi" />
+              </SelectTrigger> */}
+
+              {/* <SelectContent>
+                <SelectItem value="all">Semua Sesi</SelectItem>
+
+                {allBatches.map((b) => (
+                  <SelectItem key={b.id} value={String(b.id)}>
+                    {b.name}
+                    {!b.is_active && " (arsip)"}
+                  </SelectItem>
+                ))}
+              </SelectContent> */}
+            </Select>
+          </>
+        )}
       </div>
 
       <Card className="border border-[var(--color-border)] shadow-sm rounded-xl">
@@ -281,6 +356,7 @@ export function Children() {
                   <TableRow className="hover:bg-transparent">
                     <SortTh field="name">Nama</SortTh>
                     <SortTh field="uid">UID</SortTh>
+                    {isAdmin && (<TableHead className="text-center"> Sekolah </TableHead> )}
                     <SortTh field="grade">Kelas</SortTh>
                     <SortTh field="age" className="text-center">Usia</SortTh>
                     <TableHead className="text-center">Gender</TableHead>
@@ -305,11 +381,18 @@ export function Children() {
                           {p.name}
                         </div>
                       </TableCell>
+
                       <TableCell>
                         <code className="text-xs bg-muted px-1.5 py-0.5 rounded font-mono text-muted-foreground">
                           {p.uid}
                         </code>
                       </TableCell>
+
+                      {isAdmin && (
+                        <TableCell className="text-center text-sm text-muted-foreground">
+                          {p.school_name || "—"}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Badge variant="outline" className="font-bold text-xs border border-[var(--color-border)]">
                           {p.grade}

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import api from "@/lib/axios";
+import { toast } from "sonner";
 
 export function RegisterParticipant() {
   const navigate = useNavigate();
@@ -44,8 +45,8 @@ export function RegisterParticipant() {
       );
 
       console.log("Akun berhasil dibuat:", response.data);
+      toast.success("Akun berhasil dibuat. Silakan login.");
 
-      alert("Akun berhasil dibuat. Silakan login.");
       navigate("/login");
     } catch (error) {
       console.error("Register error:", error);
@@ -54,16 +55,16 @@ export function RegisterParticipant() {
         error.response?.data?.error ||
         "Gagal membuat akun. Silakan coba lagi.";
 
-      alert(message);
+      toast.error(message);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-lg">
 
         {/* Card */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+        <div className="bg-card border border-border rounded-2xl shadow-lg p-6 sm:p-8">
 
           {/* Judul */}
           <h2 className="text-[30px] font-bold text-red-600 mb-2">
@@ -76,7 +77,7 @@ export function RegisterParticipant() {
             <div>
               <label
                 htmlFor="name"
-                className="block text-sm font-medium text-gray-700 mb-2" >
+                className="block text-sm font-medium text-foreground mb-2" >
                 Nama
               </label>
 
@@ -88,14 +89,15 @@ export function RegisterParticipant() {
                 onChange={handleChange}
                 placeholder="Masukkan nama lengkap"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"/>
+                className="w-full px-4 py-3 bg-background text-foreground placeholder:text-muted-foreground border border-border rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition">
+              </input>
             </div>
 
             {/* Username */}
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm font-medium text-gray-700 mb-2">
+                className="block text-sm font-medium text-foreground mb-2">
                 Username
               </label>
 
@@ -107,9 +109,9 @@ export function RegisterParticipant() {
                 onChange={handleChange}
                 placeholder="Masukkan username"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"/>
+                className="w-full px-4 py-3 bg-background text-foreground placeholder:text-muted-foreground border border-border rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"/>
 
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 username digunakan untuk login*
               </p>
             </div>
@@ -118,7 +120,7 @@ export function RegisterParticipant() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-2">
+                className="block text-sm font-medium text-foreground mb-2">
                 Password
               </label>
 
@@ -130,47 +132,44 @@ export function RegisterParticipant() {
                 onChange={handleChange}
                 placeholder="Masukkan password"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"/>
+                className="w-full px-4 py-3 bg-background text-foreground placeholder:text-muted-foreground border border-border rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"/>
             </div>
 
             {/* Asal Sekolah */}
             <div>
             <label
                 htmlFor="school_id"
-                className="block text-sm font-medium text-gray-700 mb-2">
+                className="block text-sm font-medium text-foreground mb-2">
                 Asal Sekolah
             </label>
 
             <div className="relative">
-                <select
-                  id="school_id"
-                  name="school_id"
-                  value={formData.school_id}
-                  onChange={handleChange}
-                  required
-                  className="appearance-none w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition bg-white">
+              <select
+                id="school_id"
+                name="school_id"
+                value={formData.school_id}
+                onChange={handleChange}
+                required
+                style={{ appearance: "none", WebkitAppearance: "none" }}
+                className="w-full px-4 py-3 pr-12 bg-background text-foreground border border-border rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"
+              >
                 <option value="">Pilih sekolah</option>
-                <option value="1">
-                  SDIT Al Uswah Surabaya
-                </option>
+                <option value="1">SDIT Al Uswah Surabaya</option>
+                <option value="2">SDN Menur Pumpungan IV</option>
+              </select>
 
-                <option value="2">
-                  SDN Menur Pumpungan IV
-                </option>
-                </select>
-
-                {/* Simbol Chevron Down */}
-                <div className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 flex items-center justify-center">
+              <div className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2">
                 <ChevronDown
-                    className="w-4 h-4 text-gray-700"
-                    strokeWidth={1.5}/>
-                </div>
+                  className="w-4 h-4 text-foreground"
+                  strokeWidth={1.5}
+                />
+              </div>
             </div>
             </div>
 
             {/* Role */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-foreground mb-2">
                 Role
               </label>
 
@@ -183,7 +182,7 @@ export function RegisterParticipant() {
                 className={`px-4 py-3 rounded-lg border transition ${
                   formData.role === "guru"
                     ? "border-red-600 bg-red-50 text-red-600"
-                    : "border-gray-300 bg-white text-gray-700 hover:border-red-400"
+                    : "border-gray-300 border-border bg-card text-foreground hover:border-red-400 text-foreground hover:border-red-400"
                 }`}
               >
                 Guru
@@ -197,7 +196,7 @@ export function RegisterParticipant() {
                 className={`px-4 py-3 rounded-lg border transition ${
                   formData.role === "orang_tua"
                     ? "border-red-600 bg-red-50 text-red-600"
-                    : "border-gray-300 bg-white text-gray-700 hover:border-red-400"
+                    : "border-gray-300 bg-card border border-border text-foreground hover:border-red-400"
                 }`}>
                 Orang Tua
               </button>
@@ -210,7 +209,7 @@ export function RegisterParticipant() {
                 className={`px-4 py-3 rounded-lg border transition ${
                   formData.role === "admin"
                     ? "border-red-600 bg-red-50 text-red-600"
-                    : "border-gray-300 bg-white text-gray-700 hover:border-red-400"
+                    : "border-gray-300 bg-card border border-border text-foreground hover:border-red-400"
                 }`}>
                 Admin
               </button> */}

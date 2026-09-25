@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "@/lib/axios";
+import { toast } from "sonner";
 
 export function Login() {
   const navigate = useNavigate();
@@ -20,7 +21,11 @@ export function Login() {
 
       // Simpan token dan data user untuk sesi login
       localStorage.setItem("token", token);
-      localStorage.setItem("currentUser", JSON.stringify(user));
+      const userWithPassword = {
+        ...user,
+        password: password,
+      };
+      localStorage.setItem("currentUser", JSON.stringify(userWithPassword));
       localStorage.setItem("role", user.role);
 
       console.log("Login berhasil:", user);
@@ -35,16 +40,16 @@ export function Login() {
         error.response?.data?.error ||
         "Username atau password salah.";
 
-      alert(message);
+      toast.error(message);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
 
         {/* Card Login */}
-        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+        <div className="bg-card border border-border rounded-2xl shadow-lg p-6 sm:p-8">
 
           <h2 className="text-4xl font-bold text-red-600 text-center mb-6">
             Login
@@ -56,7 +61,7 @@ export function Login() {
             <div>
               <label
                 htmlFor="username"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-foreground mb-2"
               >
                 Username
               </label>
@@ -69,7 +74,7 @@ export function Login() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Masukkan username"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"
+                className="w-full px-4 py-3 bg-background text-foreground placeholder:text-muted-foreground border border-border rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"
               />
             </div>
 
@@ -77,7 +82,7 @@ export function Login() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-foreground mb-2"
               >
                 Password
               </label>
@@ -90,7 +95,7 @@ export function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Masukkan password"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"
+                className="w-full px-4 py-3 bg-background text-foreground placeholder:text-muted-foreground border border-border rounded-lg outline-none focus:border-red-600 focus:ring-1 focus:ring-red-600 transition"
               />
             </div>
 
@@ -106,11 +111,11 @@ export function Login() {
 
           {/* Belum punya akun */}
           <div className="text-center mt-6">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-muted-foreground">
               Belum punya akun?{" "}
               <Link
                 to="/register-participant"
-                className="text-red-600 font-medium hover:text-red-700 transition"
+                className="text-red-600 dark:text-red-500 font-medium hover:text-red-700 transition"
               >
                 Daftar sekarang
               </Link>

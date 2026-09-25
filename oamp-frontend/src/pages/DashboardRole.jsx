@@ -12,11 +12,20 @@ import {
   UserPlus,
   Download,
   Clock,
-  Layers,
+  // Layers,
 } from "lucide-react";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function DashboardRole() {
   const [leaderboardMode, setLeaderboardMode] = useState("training");
+  const [selectedSchoolId, setSelectedSchoolId] = useState("all");
 
   // Ambil akun yang sedang login
   const currentUser = useMemo(() => {
@@ -30,9 +39,21 @@ export function DashboardRole() {
 
   const role = currentUser?.role || "";
 
+  const { data: schoolsRes, isLoading: schoolsLoading } = useQuery({
+    queryKey: ["schools"],
+    queryFn: () => api.get("/schools"),
+    enabled: role === "admin",
+  });
+
+  const schools = schoolsRes?.data || [];
+
+  const selectedSchool = schools.find(
+    (item) => String(item.id) === String(selectedSchoolId)
+  );
+
   const school =
     role === "admin"
-      ? "Semua Sekolah"
+      ? selectedSchool?.name || "Pilih Sekolah"
       : currentUser?.school?.name || "Sekolah belum tersedia";
 
   const roleLabel =
@@ -49,6 +70,11 @@ export function DashboardRole() {
     params: {
       batch_id: "all",
       mode: leaderboardMode,
+      ...(role === "admin" &&
+      selectedSchoolId &&
+      selectedSchoolId !== "all"
+        ? { school_id: selectedSchoolId }
+        : {}),
     },
   };
 
@@ -57,14 +83,16 @@ export function DashboardRole() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["leaderboard-role", leaderboardMode],
+    queryKey: ["leaderboard-role", leaderboardMode, selectedSchoolId],
     queryFn: () => api.get("/leaderboard", batchParams),
+    enabled: role !== "admin" || !!selectedSchoolId,
     refetchInterval: 5000,
   });
 
   const { data: timeStatsRes } = useQuery({
-    queryKey: ["time-stats-role", leaderboardMode],
+    queryKey: ["time-stats-role", leaderboardMode, selectedSchoolId],
     queryFn: () => api.get("/leaderboard/time-stats", batchParams),
+    enabled: role !== "admin" || !!selectedSchoolId,
     refetchInterval: 5000,
   });
 
@@ -99,9 +127,38 @@ export function DashboardRole() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 mt-2 text-sm text-muted-foreground">
-            <Layers className="h-4 w-4" />
-            <span>{school}</span>
-          </div>
+          {/* <Layers className="h-4 w-4" /> */}
+
+            {role === "admin" ? (
+              <Select
+                value={selectedSchoolId}
+                onValueChange={setSelectedSchoolId}
+                disabled={schoolsLoading}
+              >
+                <SelectTrigger className="w-[240px] bg-white border border-[var(--color-border)] shadow-sm rounded-xl">
+                  <SelectValue
+                    placeholder={
+                      schoolsLoading ? "Memuat sekolah..." : "Pilih Sekolah"
+                    }
+                  />
+                </SelectTrigger>
+
+                <SelectContent className="bg-background text-foreground border-border">
+                  <SelectItem value="all" className="text-foreground focus:bg-muted focus:text-foreground" >
+                    Semua Sekolah
+                  </SelectItem>
+
+                  {schools.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)} className="text-foreground focus:bg-muted focus:text-foreground">
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <span>{school}</span>
+            )}
+        </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -134,19 +191,19 @@ export function DashboardRole() {
 
           {/* Register */}
           <Button asChild variant="outline" size="sm">
-            <Link to="/register">
+            <Link to="/pendaftaran">
               <UserPlus className="h-4 w-4 mr-2" />
-              Register New
+              Daftar Peserta
             </Link>
           </Button>
 
           {/* Report */}
-          <Button asChild variant="outline" size="sm">
+          {/* <Button asChild variant="outline" size="sm">
             <Link to="/export">
               <Download className="h-4 w-4 mr-2" />
               Report
             </Link>
-          </Button>
+          </Button> */}
         </div>
       </div>
 

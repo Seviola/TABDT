@@ -219,24 +219,29 @@ export function Participants() {
             placeholder="Cari nama, UID, atau kelas..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-white border border-[var(--color-border)] shadow-sm rounded-xl"
+            className="pl-9 bg-background text-foreground border border-[var(--color-border)] shadow-sm rounded-xl placeholder:text-muted-foreground"
           />
         </div>
         <Select value={selectedBatch} onValueChange={setSelectedBatch}>
-          <SelectTrigger className="w-[200px] bg-white border border-[var(--color-border)] shadow-sm rounded-xl">
-            <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-            <SelectValue placeholder="Semua Sesi" />
+        <SelectTrigger
+          className=" w-[200px] bg-background text-foreground border border-[var(--color-border)] shadow-sm rounded-xl dark:bg-background dark:text-foreground ">
+          <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+          <SelectValue placeholder="Semua Sesi" className="text-foreground" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Sesi</SelectItem>
-            {allBatches.map((b) => (
-              <SelectItem key={b.id} value={String(b.id)}>
-                {b.name}
-                {!b.is_active && " (arsip)"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+
+        <SelectContent className="bg-background text-foreground border-border">
+          <SelectItem value="all" className="text-foreground focus:bg-muted">
+            Semua Sesi
+          </SelectItem>
+
+          {allBatches.map((b) => (
+            <SelectItem key={b.id} value={String(b.id)} className="text-foreground focus:bg-muted">
+              {b.name}
+              {!b.is_active && " (arsip)"}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
       </div>
 
       <Card className="border border-[var(--color-border)] shadow-sm rounded-xl">

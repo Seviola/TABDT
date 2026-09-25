@@ -54,9 +54,9 @@ type Participant struct {
 	ID                uint      `json:"id" gorm:"primaryKey"`
 	UID               string    `json:"uid" binding:"omitempty" gorm:"uniqueIndex;not null"`
 	Name              string    `json:"name" binding:"required" gorm:"size:100;not null"`
-	Age               int       `json:"age" binding:"required,gte=3,lte=150" gorm:"not null"`
+	Age    			  int    	`json:"age" binding:"omitempty,gte=3,lte=150" gorm:"not null"`
 	Grade             string    `json:"grade" binding:"required" gorm:"size:30"`
-	Gender            string    `json:"gender" binding:"required,oneof=male female" gorm:"size:10"`
+	Gender 			  string 	`json:"gender" binding:"omitempty,oneof=male female" gorm:"size:10"`
 	Height            float64   `json:"height" binding:"omitempty,gt=0,lte=300"`
 	Weight            float64   `json:"weight" binding:"omitempty,gt=0,lte=500"`
 	HeartRate         int       `json:"heart_rate" binding:"omitempty,gte=40,lte=220"`
@@ -67,6 +67,8 @@ type Participant struct {
 	AiAnalysisUpdatedAt  *time.Time `json:"ai_analysis_updated_at"`
 	SyncedAt             *time.Time `json:"synced_at"`
 	CreatedAt            time.Time  `json:"created_at"`
+	SchoolID 			*uint 		`json:"school_id"`
+	// School              *School    `json:"school,omitempty" gorm:"foreignKey:SchoolID"`
 }
 
 type EventBatch struct {

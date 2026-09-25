@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/axios";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import {
 
 export function Paywall() {
   const { uid } = useParams();
+  const navigate = useNavigate();
   const [paid, setPaid] = useState(false);
   const [processing, setProcessing] = useState(false);
 
@@ -199,8 +200,8 @@ export function Paywall() {
           </Button> */}
 
           {/* Back */}
-          <Button asChild variant="ghost" size="sm" className="w-full">
-            <Link to="/register"><ArrowLeft className="h-4 w-4 mr-1" />Kembali ke Registrasi</Link>
+          <Button variant="ghost" size="sm" className="w-full" onClick={() => navigate(-1)} >
+            <ArrowLeft className="h-4 w-4 mr-1" /> Kembali ke Registrasi
           </Button>
         </CardContent>
       </Card>

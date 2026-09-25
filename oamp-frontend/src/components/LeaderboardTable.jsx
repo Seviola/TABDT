@@ -119,6 +119,7 @@ export function LeaderboardTable({ data, loading }) {
             <TableHead className="text-center">Kelas</TableHead>
             <TableHead className="text-center">waktu</TableHead>
             <TableHead className="hidden text-center">Selisih Waktu</TableHead>
+            <TableHead className="text-center">Percobaan</TableHead>
             <TableHead className="text-center">Level</TableHead>
           </TableRow>
         </TableHeader>
@@ -187,6 +188,11 @@ export function LeaderboardTable({ data, loading }) {
                     row.rank <= 3 ? "text-foreground" : "text-muted-foreground"
                   )}>
                     {time != null ? `${time.toFixed(2)} s` : "—"}
+                  </span>
+                </TableCell>
+                <TableCell className="text-center">
+                  <span className="font-bold text-sm tabular-nums">
+                    {row.attempts ?? 0}
                   </span>
                 </TableCell>
                 <TableCell className="hidden text-center">

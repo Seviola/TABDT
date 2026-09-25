@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"log"
 	"oamp-backend/internal/config"
 	"oamp-backend/internal/model"
 	"oamp-backend/pkg/response"
@@ -20,6 +21,56 @@ func parseUint(s string, result *uint) (bool, error) {
 	return true, nil
 }
 
+func getSchoolID(c *gin.Context) *uint {
+	roleValue, _ := c.Get("role")
+	role, _ := roleValue.(string)
+
+	// Admin menggunakan school_id dari query parameter
+	if role == "admin" {
+		schoolIDStr := c.Query("school_id")
+
+		if schoolIDStr == "" || schoolIDStr == "all" {
+			var allSchools uint = 0
+			return &allSchools
+		}
+
+		var schoolID uint
+		if _, err := parseUint(schoolIDStr, &schoolID); err != nil {
+			return nil
+		}
+
+		return &schoolID
+	}
+
+	// Guru / Orang Tua menggunakan school_id dari JWT
+	value, exists := c.Get("school_id")
+	if !exists || value == nil {
+		return nil
+	}
+
+	switch v := value.(type) {
+	case float64:
+		id := uint(v)
+		return &id
+	case uint:
+		return &v
+	case *uint:
+		return v
+	default:
+		return nil
+	}
+}
+
+func isAdmin(c *gin.Context) bool {
+	roleValue, exists := c.Get("role")
+	if !exists {
+		return false
+	}
+
+	role, ok := roleValue.(string)
+	return ok && role == "admin"
+}
+
 type LeaderboardEntry struct {
 	Rank            int     `json:"rank"`
 	ParticipantID   uint    `json:"participant_id"`
@@ -34,6 +85,7 @@ type LeaderboardEntry struct {
 	LevelReached    int     `json:"level_reached"`
 	DexterityScore  float64 `json:"dexterity_score"`
 	Score           float64 `json:"score"`
+	Attempts        int     `json:"attempts"`
 }
 
 type TimelineEntry struct {
@@ -43,11 +95,11 @@ type TimelineEntry struct {
 }
 
 type TimeStats struct {
-	FastestTime  float64 `json:"fastest_time"`
-	AverageTime  float64 `json:"average_time"`
+	FastestTime float64 `json:"fastest_time"`
+	AverageTime float64 `json:"average_time"`
 }
 
-func fetchLeaderboard(limit int, batchID *uint, mode string) []LeaderboardEntry {
+func fetchLeaderboard(limit int, batchID *uint, mode string, schoolID *uint) []LeaderboardEntry {
 	query := `
         SELECT
             ROW_NUMBER() OVER (ORDER BY sub.score DESC) AS rank,
@@ -62,10 +114,17 @@ func fetchLeaderboard(limit int, batchID *uint, mode string) []LeaderboardEntry 
             sub.total_time,
             sub.level_reached,
             sub.dexterity_score,
-            sub.score
+            sub.score,
+            (
+                SELECT COUNT(*)
+                FROM game_sessions gs
+                WHERE gs.participant_id = sub.participant_id
+                AND gs.mode = sub.mode
+            ) AS attempts
         FROM (
             SELECT DISTINCT ON (participant_id)
                 participant_id,
+                mode,
                 visuo_spatial_fit,
                 total_time,
                 level_reached,
@@ -94,8 +153,20 @@ func fetchLeaderboard(limit int, batchID *uint, mode string) []LeaderboardEntry 
             ORDER BY participant_id, score DESC
         ) sub
         JOIN participants p ON p.id = sub.participant_id
-        ORDER BY sub.score DESC
     `
+
+	if schoolID != nil {
+		if *schoolID == 0 {
+			query += " WHERE p.school_id IS NOT NULL"
+		} else {
+			query += " WHERE p.school_id = ?"
+			args = append(args, *schoolID)
+		}
+	} else {
+		query += " WHERE p.school_id IS NULL"
+	}
+
+	query += ` ORDER BY sub.score DESC`
 
 	if limit > 0 {
 		query += " LIMIT ?"
@@ -103,12 +174,97 @@ func fetchLeaderboard(limit int, batchID *uint, mode string) []LeaderboardEntry 
 	}
 
 	var entries []LeaderboardEntry
-	config.DB.Raw(query, args...).Scan(&entries)
+
+	result := config.DB.Raw(query, args...).Scan(&entries)
+
+	if result.Error != nil {
+		log.Println("LEADERBOARD QUERY ERROR:", result.Error)
+		log.Println("LEADERBOARD QUERY:", query)
+		log.Println("LEADERBOARD ARGS:", args)
+	}
+
+	return entries
+}
+
+func fetchPublicLeaderboard(limit int, batchID *uint, mode string) []LeaderboardEntry {
+	query := `
+		SELECT
+			ROW_NUMBER() OVER (ORDER BY sub.score DESC) AS rank,
+			sub.participant_id,
+			p.uid,
+			p.name,
+			p.grade,
+			p.age,
+			p.gender,
+			p.is_premium,
+			sub.visuo_spatial_fit,
+			sub.total_time,
+			sub.level_reached,
+			sub.dexterity_score,
+			sub.score,
+			(
+				SELECT COUNT(*)
+				FROM game_sessions gs
+				WHERE gs.participant_id = sub.participant_id
+				AND gs.mode = sub.mode
+			) AS attempts
+		FROM (
+			SELECT DISTINCT ON (participant_id)
+				participant_id,
+				mode,
+				visuo_spatial_fit,
+				total_time,
+				level_reached,
+				dexterity_score,
+				ROUND(score, 2) AS score
+			FROM game_sessions`
+
+	var args []any
+	var conditions []string
+
+	if batchID != nil {
+		conditions = append(conditions, "event_batch_id = ?")
+		args = append(args, *batchID)
+	}
+
+	if mode != "" {
+		conditions = append(conditions, "mode = ?")
+		args = append(args, mode)
+	}
+
+	if len(conditions) > 0 {
+		query += " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	query += `
+			ORDER BY participant_id, score DESC
+		) sub
+		JOIN participants p ON p.id = sub.participant_id
+		WHERE p.school_id IS NULL
+		ORDER BY sub.score DESC
+	`
+
+	if limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, limit)
+	}
+
+	var entries []LeaderboardEntry
+
+	result := config.DB.Raw(query, args...).Scan(&entries)
+
+	if result.Error != nil {
+		log.Println("PUBLIC LEADERBOARD QUERY ERROR:", result.Error)
+		log.Println("PUBLIC LEADERBOARD QUERY:", query)
+		log.Println("PUBLIC LEADERBOARD ARGS:", args)
+	}
+
 	return entries
 }
 
 func GetLeaderboard(c *gin.Context) {
 	var batchID *uint
+
 	if idStr := c.Query("batch_id"); idStr != "" {
 		if idStr != "all" {
 			var id uint
@@ -122,8 +278,22 @@ func GetLeaderboard(c *gin.Context) {
 			batchID = &activeID
 		}
 	}
+
 	mode := c.Query("mode")
-	entries := fetchLeaderboard(0, batchID, mode)
+	schoolID := getSchoolID(c)
+
+	if !isAdmin(c) {
+		roleValue, exists := c.Get("role")
+
+		// Tidak ada role = pengguna umum
+		if !exists || roleValue == nil {
+			entries := fetchPublicLeaderboard(0, batchID, mode)
+			response.OKWithMessage(c, "Leaderboard fetched successfully", entries)
+			return
+		}
+	}
+
+	entries := fetchLeaderboard(0, batchID, mode, schoolID)
 	response.OKWithMessage(c, "Leaderboard fetched successfully", entries)
 }
 
@@ -187,7 +357,8 @@ func GetLeaderboardTimeStats(c *gin.Context) {
 		SELECT
 			COALESCE(MIN(gs.total_time), 0) AS fastest_time,
 			COALESCE(AVG(gs.total_time), 0) AS average_time
-		FROM game_sessions gs `
+		FROM game_sessions gs
+		JOIN participants p ON p.id = gs.participant_id `
 
 	if idStr != "" && idStr != "all" {
 		var id uint
@@ -221,6 +392,34 @@ func GetLeaderboardTimeStats(c *gin.Context) {
 	}
 
 	conditions = append(conditions, "gs.total_time > 0")
+
+	roleValue, roleExists := c.Get("role")
+
+	if !roleExists || roleValue == nil {
+		// Tanpa login = peserta umum
+		conditions = append(conditions, "p.school_id IS NULL")
+	} else {
+		schoolID := getSchoolID(c)
+
+		if isAdmin(c) {
+			if schoolID != nil {
+				if *schoolID == 0 {
+					// Admin: Semua Sekolah
+					conditions = append(conditions, "p.school_id IS NOT NULL")
+				} else {
+					// Admin: sekolah tertentu
+					conditions = append(conditions, "p.school_id = ?")
+					args = append(args, *schoolID)
+				}
+			}
+		} else {
+			// Guru / Orang Tua
+			if schoolID != nil {
+				conditions = append(conditions, "p.school_id = ?")
+				args = append(args, *schoolID)
+			}
+		}
+	}
 
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
