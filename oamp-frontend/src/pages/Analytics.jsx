@@ -229,6 +229,10 @@ export function Analytics() {
     gameResult.task01, gameResult.task02, gameResult.task03, gameResult.task04,
     gameResult.task05, gameResult.task06, gameResult.task07, gameResult.task08,
   ] : [];
+  const averageLevelTime =
+    tasks.length === 8 && tasks.every((t) => typeof t === "number" && t > 0)
+      ? tasks.reduce((sum, t) => sum + t, 0) / 8
+      : null;
   const hasTasks = tasks.some(t => t > 0);
   const cognitiveAge = gameResult?.cognitive_age;
   const variants = gameResult?.variant_list || [];
@@ -303,14 +307,14 @@ export function Analytics() {
       </div>
 
       {/* Premium gate banner */}
-      {!isPremium && (
+      {/* {!isPremium && (
         <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm flex items-center justify-between gap-3">
           <span className="flex items-center gap-2"><Lock className="h-4 w-4" />Data peserta terkunci. Bayar untuk membuka akses penuh.</span>
           <Button size="sm" asChild>
             <Link to={`/paywall/${uid}`}><CreditCard className="h-3.5 w-3.5 mr-1" />Bayar Rp 10.000</Link>
           </Button>
         </div>
-      )}
+      )} */}
 
       {/* Profile card */}
       <ParticipantCard participant={participant} sessions={sessions} />
@@ -548,9 +552,9 @@ export function Analytics() {
                     <TableHead className="w-12 text-xs uppercase text-muted-foreground">#</TableHead>
                     <TableHead className="text-xs uppercase text-muted-foreground">Mode</TableHead>
                     <TableHead className="text-center text-xs uppercase text-muted-foreground">Level</TableHead>
-                    <TableHead className="text-center text-xs uppercase text-muted-foreground">Skor</TableHead>
+                    <TableHead className="text-center text-xs uppercase text-muted-foreground">Rata-Rata Waktu</TableHead>
                     <TableHead className="text-center text-xs uppercase text-muted-foreground">Waktu</TableHead>
-                    <TableHead className="text-center text-xs uppercase text-muted-foreground">Ketangkasan</TableHead>
+                    {/* <TableHead className="text-center text-xs uppercase text-muted-foreground">Ketangkasan</TableHead> */}
                     <TableHead className="text-center text-xs uppercase text-muted-foreground">Umur Kognitif</TableHead>
                     <TableHead className="text-xs uppercase text-muted-foreground">Tanggal</TableHead>
                   </TableRow>
@@ -560,6 +564,7 @@ export function Analytics() {
                     const score = getSessionScore(s);
                     const isBest = bestScore != null && score === bestScore;
                     const isMaxLevel = maxLevel != null && s.level_reached === maxLevel;
+                    const averageSessionTime = s.level_reached === 8 && s.total_time != null ? s.total_time / s.level_reached : null;
 
                     return (
                       <TableRow key={s.id} className="group">
@@ -585,16 +590,16 @@ export function Analytics() {
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={cn("font-bold text-base tabular-nums", isBest ? "text-amber-600" : "text-foreground")}>
-                            {score != null ? Math.round(score) : "—"}
+                          <span className="font-bold text-base tabular-nums text-foreground">
+                            {averageSessionTime != null ? `${averageSessionTime.toFixed(2)}s` : "—"}
                           </span>
                         </TableCell>
                         <TableCell className="text-center font-mono text-muted-foreground">
                           {s.total_time?.toFixed(1)}s
                         </TableCell>
-                        <TableCell className="text-center font-mono text-foreground">
+                        {/* <TableCell className="text-center font-mono text-foreground">
                           {s.dexterity_score?.toFixed(1) ?? "—"}
-                        </TableCell>
+                        </TableCell> */}
                         <TableCell className="text-center text-muted-foreground">
                           {s.cognitive_age ?? "—"}
                         </TableCell>
