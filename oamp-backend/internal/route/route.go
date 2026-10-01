@@ -2,11 +2,11 @@ package route
 
 import (
 	"net/http"
-	"os"
-	"strings"
 	"oamp-backend/internal/controller"
 	"oamp-backend/internal/middleware"
 	"oamp-backend/internal/websocket"
+	"os"
+	"strings"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -76,16 +76,17 @@ func SetupRoutes(r *gin.Engine) {
 
 		api.GET("/auth/me", middleware.AuthRequired(), func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
-				"user_id":  c.MustGet("user_id"),
-				"username": c.MustGet("username"),
-				"role":     c.MustGet("role"),
+				"user_id":   c.MustGet("user_id"),
+				"username":  c.MustGet("username"),
+				"role":      c.MustGet("role"),
 				"school_id": c.MustGet("school_id"),
 			})
 		})
 
 		// Schools
 		api.GET("/schools", middleware.AuthRequired(), controller.GetSchools)
-		api.POST("/admin/schools/:id/reset-participants", middleware.AuthRequired(), controller.ResetSchoolParticipants,)
+		api.GET("/schools/participant-stats", middleware.AuthRequired(), controller.GetSchoolParticipantStats)
+		api.POST("/admin/schools/:id/reset-participants", middleware.AuthRequired(), controller.ResetSchoolParticipants)
 
 		// Participant registration
 		api.POST("/participants", middleware.OptionalAuth(), controller.RegisterParticipant)

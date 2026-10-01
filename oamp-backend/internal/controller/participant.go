@@ -7,7 +7,9 @@ import (
 	"oamp-backend/internal/config"
 	"oamp-backend/internal/model"
 	"oamp-backend/pkg/response"
+	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -64,16 +66,14 @@ func RegisterParticipant(c *gin.Context) {
 			return
 		}
 
-		// UID otomatis hanya untuk guru/admin.
+		// UID otomatis hanya untuk guru
 		role, ok := roleValue.(string)
 		if !ok || (role != "guru" && role != "admin") {
 			response.Error(c, http.StatusBadRequest, "UID is required")
 			return
 		}
 
-		var school model.School
-
-		// Guru/Admin harus memiliki sekolah.
+		// Guru harus memiliki sekolah.
 		if participant.SchoolID == nil {
 			response.Error(
 				c,
@@ -83,66 +83,58 @@ func RegisterParticipant(c *gin.Context) {
 			return
 		}
 
-		// Ambil data sekolah.
-		if err := config.DB.First(&school, *participant.SchoolID).Error; err != nil {
-			response.Error(c, http.StatusBadRequest, "School not found")
-			return
-		}
+		// Bersihkan nama:
+		baseName := strings.ToLower(strings.TrimSpace(participant.Name))
+		baseName = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(baseName, "")
 
-		// Pastikan kode sekolah sudah tersedia.
-		if school.Code == "" {
+		if baseName == "" {
 			response.Error(
 				c,
 				http.StatusBadRequest,
-				"School UID code is not configured",
+				"Participant name cannot be used for UID generation",
 			)
 			return
 		}
 
-		// Tambahkan counter UID khusus untuk sekolah ini.
-		if err := config.DB.Model(&model.School{}).
-			Where("id = ?", school.ID).
-			UpdateColumn(
-				"uid_counter",
-				gorm.Expr("uid_counter + 1"),
-			).Error; err != nil {
+		// Format nomor berbeda berdasarkan sekolah:
+		schoolID := *participant.SchoolID
+		number := 1
+		for {
+			var candidateUID string
+			if schoolID == 2 {
+				candidateUID = fmt.Sprintf("%s%02d", baseName, number)
+			} else {
+				candidateUID = fmt.Sprintf("%s%d", baseName, number)
+			}
+			var existing model.Participant
 
-			log.Printf(
-				"[participant] failed to update school UID counter: %v",
-				err,
-			)
+			err := config.DB.
+				Where("uid = ?", candidateUID).
+				First(&existing).Error
 
-			response.Error(
-				c,
-				http.StatusInternalServerError,
-				"Failed to generate participant UID",
-			)
-			return
+			if err == gorm.ErrRecordNotFound {
+				participant.UID = candidateUID
+				break
+			}
+
+			if err != nil {
+				log.Printf(
+					"[participant] failed to check UID %s: %v",
+					candidateUID,
+					err,
+				)
+
+				response.Error(
+					c,
+					http.StatusInternalServerError,
+					"Failed to generate participant UID",
+				)
+				return
+			}
+
+			number++
 		}
-
-		// Ambil counter terbaru.
-		if err := config.DB.First(&school, school.ID).Error; err != nil {
-			response.Error(
-				c,
-				http.StatusInternalServerError,
-				"Failed to generate participant UID",
-			)
-			return
-		}
-
-		participant.UID = fmt.Sprintf(
-			"%s%03d",
-			school.Code,
-			school.UIDCounter,
-		)
 	}
-
-	log.Printf(
-		"[participant] registering UID=%s Name=%s SchoolID=%v",
-		participant.UID,
-		participant.Name,
-		participant.SchoolID,
-	)
 
 	var existing model.Participant
 
@@ -426,6 +418,64 @@ func GetParticipantsWithScores(c *gin.Context) {
 	)
 
 	response.OKWithMessage(c, "Participants fetched successfully", results)
+}
+
+type SchoolParticipantStats struct {
+	ID         uint    `json:"id"`
+	UID        string  `json:"uid"`
+	Name       string  `json:"name"`
+	Grade      string  `json:"grade"`
+	SchoolID   uint    `json:"school_id"`
+	SchoolName string  `json:"school_name"`
+	Attempts   int     `json:"attempts"`
+	TotalTime  float64 `json:"total_time"`
+}
+
+func GetSchoolParticipantStats(c *gin.Context) {
+	query := `
+		SELECT
+			p.id,
+			p.uid,
+			p.name,
+			p.grade,
+			p.school_id,
+			s.name AS school_name,
+			COUNT(gs.id) AS attempts,
+			COALESCE(SUM(gs.total_time), 0) AS total_time
+		FROM participants p
+		JOIN schools s ON s.id = p.school_id
+		LEFT JOIN game_sessions gs
+			ON gs.participant_id = p.id
+		GROUP BY
+			p.id,
+			p.uid,
+			p.name,
+			p.grade,
+			p.school_id,
+			s.name
+		ORDER BY
+			s.name ASC,
+			total_time ASC,
+			p.name ASC
+	`
+
+	var results []SchoolParticipantStats
+
+	if err := config.DB.Raw(query).Scan(&results).Error; err != nil {
+		log.Printf("[school-participant-stats] query error: %v", err)
+		response.Error(
+			c,
+			http.StatusInternalServerError,
+			"Failed to fetch school participant stats",
+		)
+		return
+	}
+
+	response.OKWithMessage(
+		c,
+		"School participant stats fetched successfully",
+		results,
+	)
 }
 
 func GetParticipantSessions(c *gin.Context) {
