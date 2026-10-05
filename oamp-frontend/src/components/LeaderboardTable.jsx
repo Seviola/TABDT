@@ -45,7 +45,7 @@ function getTimeDiff(row, data, index) {
   return currentTime - prevTime;
 }
 
-export function LeaderboardTable({ data, loading }) {
+export function LeaderboardTable({ data, loading, hideAge = false }) {
   const navigate = useNavigate();
 
   if (loading) {
@@ -173,7 +173,9 @@ export function LeaderboardTable({ data, loading }) {
                       <p className="font-bold text-sm group-hover:text-primary transition-colors">
                         {row.name}
                       </p>
-                      <p className="text-xs text-muted-foreground">{row.age} th</p>
+                      {!hideAge && (
+                        <p className="text-xs text-muted-foreground">{row.age} th</p>
+                      )}
                     </div>
                   </div>
                 </TableCell>

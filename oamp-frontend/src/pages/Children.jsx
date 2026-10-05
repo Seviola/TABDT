@@ -358,8 +358,8 @@ export function Children() {
                     <SortTh field="uid">UID</SortTh>
                     {isAdmin && (<TableHead className="text-center"> Sekolah </TableHead> )}
                     <SortTh field="grade">Kelas</SortTh>
-                    <SortTh field="age" className="text-center">Usia</SortTh>
-                    <TableHead className="text-center">Gender</TableHead>
+                    {/* <SortTh field="age" className="text-center">Usia</SortTh>
+                    <TableHead className="text-center">Gender</TableHead> */}
                     <SortTh field="total_time" className="text-center">Waktu</SortTh>
                     <SortTh field="level_reached" className="text-center">Level</SortTh>
                     <TableHead className="text-center">Aksi</TableHead>
@@ -398,10 +398,10 @@ export function Children() {
                           {p.grade}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center text-muted-foreground">{p.age}</TableCell>
+                      {/* <TableCell className="text-center text-muted-foreground">{p.age}</TableCell>
                       <TableCell className="text-center capitalize text-muted-foreground">
                         {p.gender || "—"}
-                      </TableCell>
+                      </TableCell> */}
                       <TableCell className="text-center">
                       {p.total_time != null ? (
                         <span className="font-bold text-foreground">

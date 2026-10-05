@@ -270,6 +270,7 @@ export function DashboardRole() {
           <LeaderboardTable
             data={leaderboard}
             loading={isLoading}
+            hideAge={true}
           />
         </CardContent>
       </Card>
