@@ -5,6 +5,8 @@ import { useAdminMode } from "@/contexts/AdminModeContext";
 import { StatusBanner } from "@/components/StatusBanner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import api from "@/lib/axios";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +25,7 @@ const navItems = [
   { to: "/schools", label: "Sekolah", icon: School },
   { to: "/pendaftaran", label: "Daftar", icon: UserPlus },
   { to: "/tournaments", label: "Cup", icon: Trophy },
+  { to: "/users", label: "Pengguna", icon: Users },
   { to: "/register", label: "Daftar", icon: UserPlus },
   { to: "/duel", label: "Duel", icon: Swords },
   { to: "/export", label: "Export", icon: Download },
@@ -30,8 +33,8 @@ const navItems = [
 
 export function Layout() {
   const isOnline = useHealthCheck();
-  const currentUser = JSON.parse(
-    localStorage.getItem("currentUser") || "null"
+  const [currentUser, setCurrentUser] = useState(() =>
+    JSON.parse(localStorage.getItem("currentUser") || "null")
   );
   const userRole = localStorage.getItem("role");
   const userName = currentUser?.name || "Pengguna";
@@ -47,7 +50,20 @@ export function Layout() {
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: "",
+    username: "",
+  });
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [isDark, setIsDark] = useState(() => {
     if (typeof window === "undefined") return false;
     const stored = localStorage.getItem("theme");
@@ -57,15 +73,145 @@ export function Layout() {
   });
 
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", isDark);
-    localStorage.setItem("theme", isDark ? "dark" : "light");
-  }, [isDark]);
+    if (!profileOpen || !localStorage.getItem("token")) return;
+
+    let cancelled = false;
+
+    async function loadProfile() {
+      setProfileLoading(true);
+
+      try {
+        const response = await api.get("/profile");
+        const user = response.user;
+
+        if (!cancelled && user) {
+          const savedUser = JSON.parse(
+            localStorage.getItem("currentUser") || "null"
+          );
+
+          const updatedUser = {
+            ...savedUser,
+            ...user,
+          };
+
+          setCurrentUser(updatedUser);
+          localStorage.setItem(
+            "currentUser",
+            JSON.stringify(updatedUser)
+          );
+
+          setProfileForm({
+            name: user.name || "",
+            username: user.username || "",
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          toast.error(
+            error.response?.data?.error || "Gagal memuat profil"
+          );
+        }
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profileOpen]);
 
   function handlePinSubmit(e) {
     e.preventDefault();
     if (!attemptActivate(pin)) {
       setPinError(true);
       setPin("");
+    }
+  }
+  
+  async function handleSaveProfile(e) {
+    e.preventDefault();
+
+    const name = profileForm.name.trim();
+    const username = profileForm.username.trim();
+
+    if (!name || !username) {
+      toast.error("Nama dan username wajib diisi");
+      return;
+    }
+
+    const changingPassword =
+      currentPassword !== "" ||
+      newPassword !== "" ||
+      confirmPassword !== "";
+
+    if (changingPassword) {
+      if (!currentPassword || !newPassword || !confirmPassword) {
+        toast.error("Lengkapi semua kolom password");
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        toast.error("Password baru minimal 6 karakter");
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        toast.error("Konfirmasi password baru tidak cocok");
+        return;
+      }
+    }
+
+    setSavingProfile(true);
+
+    try {
+      const response = await api.put("/profile", {
+        name,
+        username,
+      });
+
+      if (response.token) {
+        localStorage.setItem("token", response.token);
+      }
+
+      if (changingPassword) {
+        await api.put("/profile/password", {
+          current_password: currentPassword,
+          new_password: newPassword,
+        });
+      }
+
+      const latest = await api.get("/profile");
+      const finalUser = latest.user || response.user;
+
+      setCurrentUser(finalUser);
+      localStorage.setItem("currentUser", JSON.stringify(finalUser));
+
+      setProfileForm({
+        name: finalUser.name || "",
+        username: finalUser.username || "",
+      });
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+
+      setEditMode(false);
+      toast.success("Profil berhasil diperbarui");
+    } catch (error) {
+      toast.error(
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Gagal memperbarui profil"
+      );
+    } finally {
+      setSavingProfile(false);
     }
   }
 
@@ -148,7 +294,8 @@ export function Layout() {
                     // ADMIN
                     if (userRole === "admin") {
                       return item.to !== "/pendaftaran"&&
-                             item.to !== "/register"
+                             item.to !== "/register" &&
+                             item.to !== "/tournaments";
                     }
 
                     return false;
@@ -252,30 +399,40 @@ export function Layout() {
       </main>
 
       {/* Profile Dialog */}
-      <Dialog open={profileOpen} onOpenChange={setProfileOpen}>
-        <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-2xl">
+      <Dialog
+        open={profileOpen}
+        onOpenChange={(open) => {
+          setProfileOpen(open);
 
+          if (!open) {
+            setEditMode(false);
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+            setShowCurrentPassword(false);
+            setShowNewPassword(false);
+            setShowConfirmPassword(false);
+          }
+        }}  >
+        
+          <DialogContent className=" w-[calc(100vw-2rem)] max-w-md max-h-[calc(100dvh-2rem)] flex flex-col overflow-hidden p-0 rounded-2xl ">
           {/* Header Profile */}
-          <div className="bg-gradient-to-r from-red-600 to-red-500 px-6 pt-7 pb-8">
+           <div className="shrink-0 bg-gradient-to-r from-red-600 to-red-500 px-4 sm:px-6 pt-5 sm:pt-7 pb-6 sm:pb-8">
             <DialogHeader>
               <div className="flex items-center gap-4">
-
-                {/* Avatar */}
                 <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white text-red-600 text-2xl font-bold shadow-md">
                   {(currentUser?.name || "U").charAt(0).toUpperCase()}
                 </div>
 
-                {/* Nama dan Username */}
                 <div className="text-white min-w-0">
                   <DialogTitle className="text-xl font-bold text-white">
-                    {currentUser?.name || "-"}
+                    {currentUser?.name || "Pengguna"}
                   </DialogTitle>
 
                   <p className="text-sm text-white/80 mt-1">
                     @{currentUser?.username || "-"}
                   </p>
 
-                  {/* Role Badge */}
                   <span className="inline-flex mt-2 rounded-full bg-white/20 px-3 py-1 text-xs font-medium text-white">
                     {currentUser?.role === "orang_tua"
                       ? "Orang Tua"
@@ -288,109 +445,297 @@ export function Layout() {
             </DialogHeader>
           </div>
 
-          {/* Profile Information */}
-          <div className="px-6 py-6 space-y-3">
+          {/* Body Profile */}
+          <div className="flex-1 min-h-0 w-full min-w-0 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6 sm:py-6 space-y-4">
+            {profileLoading ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Memuat profil...
+              </p>
+            ) : editMode ? (
+              <>
+                <form onSubmit={handleSaveProfile} className="w-full min-w-0 space-y-4">
+                  {/* Nama */}
+                  <div className="w-full min-w-0 space-y-1.5">
+                    <label className="text-sm font-medium">
+                      Nama Pengguna
+                    </label>
+                    <Input
+                      value={profileForm.name}
+                      onChange={(e) =>
+                        setProfileForm({
+                          ...profileForm,
+                          name: e.target.value,
+                        })
+                      }
+                      placeholder="Masukkan nama"
+                      maxLength={100}
+                      required
+                    />
+                  </div>
 
-            {/* Sekolah */}
-            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
-                <School className="h-5 w-5" />
-              </div>
+                  {/* Username */}
+                  <div className="w-full min-w-0 space-y-1.5">
+                    <label className="text-sm font-medium">
+                      Username
+                    </label>
+                    <Input
+                      value={profileForm.username}
+                      onChange={(e) =>
+                        setProfileForm({
+                          ...profileForm,
+                          username: e.target.value,
+                        })
+                      }
+                      placeholder="Masukkan username"
+                      maxLength={100}
+                      required
+                    />
+                  </div>
 
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">
-                  Sekolah
-                </p>
+                  <div className="border-t border-border pt-4">
+                    <h4 className="text-sm font-semibold">
+                      Ubah Password (Opsional)
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Kosongkan ketiga kolom password jika tidak ingin menggantinya.
+                    </p>
+                  </div>
 
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {currentUser?.school?.name || "-"}
-                </p>
-              </div>
-            </div>
+                  {/* Password Lama */}
+                  <div className="w-full min-w-0 space-y-1.5">
+                    <label className="text-sm font-medium">
+                      Password Lama
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type={showCurrentPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Masukkan password lama"
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        onClick={() =>
+                          setShowCurrentPassword(!showCurrentPassword)
+                        }
+                        aria-label="Tampilkan atau sembunyikan password lama"
+                      >
+                        {showCurrentPassword
+                          ? <EyeOff className="h-4 w-4" />
+                          : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-            {/* Username */}
-            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
-                <User className="h-5 w-5" />
-              </div>
+                  {/* Password Baru */}
+                  <div className="w-full min-w-0 space-y-1.5">
+                    <label className="text-sm font-medium">
+                      Password Baru
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type={showNewPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Minimal 6 karakter"
+                        minLength={6}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        onClick={() => setShowNewPassword(!showNewPassword)}
+                        aria-label="Tampilkan atau sembunyikan password baru"
+                      >
+                        {showNewPassword
+                          ? <EyeOff className="h-4 w-4" />
+                          : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Username
-                </p>
+                  {/* Konfirmasi Password */}
+                  <div className="w-full min-w-0 space-y-1.5">
+                    <label className="text-sm font-medium">
+                      Konfirmasi Password Baru
+                    </label>
+                    <div className="relative">
+                      <Input
+                        type={showConfirmPassword ? "text" : "password"}
+                        autoComplete="new-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Ulangi password baru"
+                        minLength={6}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
+                        aria-label="Tampilkan atau sembunyikan konfirmasi password"
+                      >
+                        {showConfirmPassword
+                          ? <EyeOff className="h-4 w-4" />
+                          : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
 
-                <p className="text-sm font-semibold text-foreground">
-                  {currentUser?.username || "-"}
-                </p>
-              </div>
-            </div>
+                  {/* Tombol Simpan dan Batal */}
+                  <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full sm:flex-1"
+                      disabled={savingProfile}
+                      onClick={() => {
+                        setEditMode(false);
+                        setProfileForm({
+                          name: currentUser?.name || "",
+                          username: currentUser?.username || "",
+                        });
+                        setCurrentPassword("");
+                        setNewPassword("");
+                        setConfirmPassword("");
+                        setShowCurrentPassword(false);
+                        setShowNewPassword(false);
+                        setShowConfirmPassword(false);
+                      }}
+                    >
+                      Batal
+                    </Button>
 
-            {/* Password */}
-            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
+                    <Button
+                      type="submit"
+                      className="w-full sm:flex-1"
+                      disabled={savingProfile}
+                    >
+                      {savingProfile ? "Menyimpan..." : "Simpan Perubahan"}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                {/* Informasi Sekolah */}
+                <div className="w-full min-w-0 flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                    <School className="h-5 w-5" />
+                  </div>
 
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
-                <Lock className="h-5 w-5" />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-muted-foreground">
-                  Password
-                </p>
-
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-foreground">
-                    {showPassword
-                      ? currentUser?.password || "-"
-                      : "••••••••"}
-                  </p>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="text-muted-foreground hover:text-red-600 transition-colors"
-                    title={
-                      showPassword
-                        ? "Sembunyikan password"
-                        : "Lihat password"
-                    }
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
-                    ) : (
-                      <Eye className="h-5 w-5" />
-                    )}
-                  </button>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      Sekolah
+                    </p>
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {currentUser?.school?.name || "-"}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-            </div>
+                {/* Username */}
+                <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                    <User className="h-5 w-5" />
+                  </div>
 
-            {/* Role */}
-            <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      Username
+                    </p>
+                    <p className="text-sm font-semibold text-foreground break-all">
+                      {currentUser?.username || "-"}
+                    </p>
+                  </div>
+                </div>
 
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
-                <ShieldCheck className="h-5 w-5" />
-              </div>
+                {/* Password */}
+                <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                    <Lock className="h-5 w-5" />
+                  </div>
 
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  Role
-                </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      Password
+                    </p>
 
-                <p className="text-sm font-semibold text-foreground">
-                  {currentUser?.role === "orang_tua"
-                    ? "Orang Tua"
-                    : currentUser?.role === "guru"
-                      ? "Guru"
-                      : currentUser?.role || "-"}
-                </p>
-              </div>
-            </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-foreground break-all">
+                        {showPassword
+                          ? currentUser?.password || "Password tidak tersedia"
+                          : "••••••••"}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="text-muted-foreground hover:text-red-600 transition-colors"
+                        title={showPassword ? "Sembunyikan password" : "Lihat password"}
+                        aria-label={showPassword ? "Sembunyikan password" : "Lihat password"}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-5 w-5" />
+                        ) : (
+                          <Eye className="h-5 w-5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Role */}
+                <div className="flex items-center gap-4 rounded-xl border border-border bg-muted px-4 py-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-muted-foreground">
+                      Role
+                    </p>
+                    <p className="text-sm font-semibold text-foreground">
+                      {currentUser?.role === "orang_tua"
+                        ? "Orang Tua"
+                        : currentUser?.role === "guru"
+                          ? "Guru"
+                          : currentUser?.role || "-"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tombol Edit Profil */}
+                <Button
+                  type="button"
+                  className="w-full"
+                  onClick={() => {
+                    setProfileForm({
+                      name: currentUser?.name || "",
+                      username: currentUser?.username || "",
+                    });
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                    setEditMode(true);
+                  }}
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Edit Profil
+                </Button>
+              </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* PIN Dialog */}
+     {/* PIN Dialog */}
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
         <DialogContent className="sm:max-w-xs">
           <DialogHeader>

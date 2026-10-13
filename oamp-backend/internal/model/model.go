@@ -122,6 +122,7 @@ type PlayerState struct {
 	ID              uint      `json:"id" gorm:"primaryKey"`
 	RoomID          string    `json:"room_id" gorm:"size:4;index;not null"`
 	PlayerName      string    `json:"player_name" gorm:"size:100;not null"`
+	PlayerUID       string    `json:"player_uid,omitempty" gorm:"size:50"`
 	CurrentLevel    int       `json:"current_level" gorm:"default:0"`
 	ElapsedTime     float64   `json:"elapsed_time" gorm:"default:0"`
 	CompletedLevels int       `json:"completed_levels" gorm:"default:0"`
@@ -135,6 +136,7 @@ type GameEvent struct {
 	Type       string  `json:"type"`
 	RoomID     string  `json:"room_id"`
 	PlayerName string  `json:"player_name"`
+	PlayerUID  string  `json:"player_uid,omitempty"`
 	Level      *int    `json:"level,omitempty"`
 	TimeSec    float64 `json:"time_sec,omitempty"`
 }

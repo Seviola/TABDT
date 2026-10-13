@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"errors"
 	"time"
 
 	"oamp-backend/internal/config"
@@ -76,7 +77,7 @@ func cleanupStaleRooms() {
 }
 
 // CreateRoomDB creates a new room with the given player as player1
-func CreateRoomDB(playerName string) (*model.Room, error) {
+func CreateRoomDB(playerName, playerUID string) (*model.Room, error) {
 	var room *model.Room
 	for attempts := 0; attempts < 5; attempts++ {
 		code := generateRoomCode()
@@ -87,6 +88,7 @@ func CreateRoomDB(playerName string) (*model.Room, error) {
 			ID:           code,
 			Status:       "waiting",
 			Player1Name:  playerName,
+			Player1UID:   playerUID,
 			LastActivity: time.Now(),
 		}
 		if err := config.DB.Create(room).Error; err == nil {
@@ -118,7 +120,7 @@ func GetRoomByCodeDB(code string) (*model.Room, error) {
 }
 
 // JoinRoomDB adds player2 to a room
-func JoinRoomDB(code, playerName string) (*model.Room, error) {
+func JoinRoomDB(code, playerName, playerUID string) (*model.Room, error) {
 	code = strings.ToUpper(code)
 	var room model.Room
 	err := config.DB.Transaction(func(tx *gorm.DB) error {
@@ -128,11 +130,12 @@ func JoinRoomDB(code, playerName string) (*model.Room, error) {
 		if room.Player2Name != "" {
 			return fmt.Errorf("room is full")
 		}
-		if room.Player1Name == playerName {
+		if room.Player1UID == playerUID {
 			return fmt.Errorf("already player1")
 		}
 		updates := map[string]interface{}{
-			"player2_name":   playerName,
+			"player2_name":  playerName,
+			"player2_uid":   playerUID,
 			"status":        "ready",
 			"last_activity": time.Now(),
 		}
@@ -147,42 +150,66 @@ func JoinRoomDB(code, playerName string) (*model.Room, error) {
 }
 
 // SetReadyDB marks a player as ready; auto-transitions to playing when both ready
-func SetReadyDB(code, playerName string) (*model.Room, error) {
+func SetReadyDB(code, playerName string, playerUID ...string) (*model.Room, error) {
 	code = strings.ToUpper(code)
 	var room model.Room
+
 	err := config.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("id = ?", code).First(&room).Error; err != nil {
 			return err
 		}
-		updates := map[string]interface{}{"last_activity": time.Now()}
-		if room.Player1Name == playerName {
+
+		uid := ""
+		if len(playerUID) > 0 {
+			uid = strings.TrimSpace(playerUID[0])
+		}
+
+		isPlayer1 := room.Player1Name == playerName
+		isPlayer2 := room.Player2Name == playerName
+
+		// Jika UID dikirim, gunakan UID untuk membedakan pemain.
+		if uid != "" {
+			isPlayer1 = isPlayer1 && room.Player1UID == uid
+			isPlayer2 = isPlayer2 && room.Player2UID == uid
+		} else if isPlayer1 && isPlayer2 {
+			return fmt.Errorf("player UID required for duplicate names")
+		}
+
+		updates := map[string]interface{}{
+			"last_activity": time.Now(),
+		}
+
+		if isPlayer1 {
 			updates["player1_ready"] = true
-		} else if room.Player2Name == playerName {
+		} else if isPlayer2 {
 			updates["player2_ready"] = true
 		} else {
 			return fmt.Errorf("player not found in room")
 		}
+
 		if err := tx.Model(&room).Updates(updates).Error; err != nil {
 			return err
 		}
-		// Reload to check both ready
+
 		if err := tx.Where("id = ?", code).First(&room).Error; err != nil {
 			return err
 		}
+
 		if room.Player1Ready && room.Player2Ready {
 			if err := tx.Model(&room).Update("status", "playing").Error; err != nil {
 				return err
 			}
-			room.Status = "playing" // update local struct for WS broadcast below
+			room.Status = "playing"
 			broadcastRoomEvent("room_playing", room.ID, room.Player1Name, room.Player2Name)
-			return nil
 		}
+
 		return nil
 	})
+
 	if err != nil {
 		return nil, err
 	}
-	// Broadcast match_start via WS when both players are ready
+
 	if wsManager != nil && room.Status == "playing" {
 		msg, _ := json.Marshal(websocket.GameMessage{
 			Type:        "match_start",
@@ -192,59 +219,76 @@ func SetReadyDB(code, playerName string) (*model.Room, error) {
 		})
 		wsManager.BroadcastToRoom(room.ID, msg)
 	}
+
 	return &room, nil
 }
 
 // LeaveRoomDB removes a player and their player_state; returns action taken
-func LeaveRoomDB(code, playerName string) (string, error) {
+func LeaveRoomDB(code, playerName string, playerUID ...string) (string, error) {
 	code = strings.ToUpper(code)
 	var action string
+
 	err := config.DB.Transaction(func(tx *gorm.DB) error {
 		var room model.Room
 		if err := tx.Where("id = ?", code).First(&room).Error; err != nil {
 			return err
 		}
+
+		uid := ""
+		if len(playerUID) > 0 {
+			uid = strings.TrimSpace(playerUID[0])
+		}
+
 		isPlayer1 := room.Player1Name == playerName
 		isPlayer2 := room.Player2Name == playerName
+
+		if uid != "" {
+			isPlayer1 = isPlayer1 && room.Player1UID == uid
+			isPlayer2 = isPlayer2 && room.Player2UID == uid
+		} else if isPlayer1 && isPlayer2 {
+			return fmt.Errorf("player UID required for duplicate names")
+		}
 
 		if !isPlayer1 && !isPlayer2 {
 			return fmt.Errorf("player not found in room")
 		}
 
-		// Always clean up this player's state first
-		if err := tx.Where("room_id = ? AND player_name = ?", code, playerName).
-			Delete(&model.PlayerState{}).Error; err != nil {
+		stateQuery := tx.Where("room_id = ? AND player_name = ?", code, playerName)
+		if uid != "" {
+			stateQuery = stateQuery.Where("player_uid = ?", uid)
+		}
+		if err := stateQuery.Delete(&model.PlayerState{}).Error; err != nil {
 			return err
 		}
 
 		if isPlayer1 && room.Player2Name != "" {
-			// Promote player2 to player1
 			action = "player_promoted"
-			updates := map[string]interface{}{
-				"player1_name":   room.Player2Name,
-				"player2_name":   "",
-				"player1_ready":  false,
-				"player2_ready":  false,
-				"status":         "waiting",
-				"last_activity":  time.Now(),
-			}
-			return tx.Model(&room).Updates(updates).Error
+			return tx.Model(&room).Updates(map[string]interface{}{
+				"player1_name":  room.Player2Name,
+				"player1_uid":   room.Player2UID,
+				"player2_name":  "",
+				"player2_uid":   "",
+				"player1_ready": false,
+				"player2_ready": false,
+				"status":        "waiting",
+				"last_activity": time.Now(),
+			}).Error
 		} else if isPlayer2 {
-			// Player2 leaves
 			action = "player2_left"
-			updates := map[string]interface{}{
-				"player2_name":   "",
-				"player1_ready":  false,
-				"player2_ready":  false,
-				"status":         "waiting",
-				"last_activity":  time.Now(),
-			}
-			return tx.Model(&room).Updates(updates).Error
+			return tx.Model(&room).Updates(map[string]interface{}{
+				"player2_name":  "",
+				"player2_uid":   "",
+				"player1_ready": false,
+				"player2_ready": false,
+				"status":        "waiting",
+				"last_activity": time.Now(),
+			}).Error
 		}
-		// Only player in room — delete room entirely
+
 		action = "room_deleted"
 		return tx.Delete(&room).Error
 	})
+
 	return action, err
 }
 
@@ -264,36 +308,75 @@ func UpsertPlayerStateDB(event model.GameEvent) error {
 		}
 
 		ps := model.PlayerState{
-			RoomID:          event.RoomID,
-			PlayerName:      event.PlayerName,
-			CurrentLevel:    0,
-			ElapsedTime:     0,
-			CompletedLevels: 0,
-			LevelTimes:      []float64{},
-			IsFinished:      false,
-		}
-		return config.DB.Where("room_id = ? AND player_name = ?", event.RoomID, event.PlayerName).
-			Assign(ps).FirstOrCreate(&ps).Error
+		RoomID:          event.RoomID,
+		PlayerName:      event.PlayerName,
+		PlayerUID:       event.PlayerUID,
+		CurrentLevel:    0,
+		ElapsedTime:     0,
+		CompletedLevels: 0,
+		LevelTimes:      []float64{},
+		IsFinished:      false,
+	}
+
+	query := config.DB.Where(
+		"room_id = ? AND player_name = ?",
+		event.RoomID,
+		event.PlayerName,
+	)
+
+	if event.PlayerUID != "" {
+		query = config.DB.Where(
+			"room_id = ? AND player_uid = ?",
+			event.RoomID,
+			event.PlayerUID,
+		)
+	}
+
+	return query.Assign(ps).FirstOrCreate(&ps).Error
 
 	case "level_start":
-		config.DB.Model(&model.Room{}).Where("id = ?", event.RoomID).
+		config.DB.Model(&model.Room{}).
+			Where("id = ?", event.RoomID).
 			Update("last_activity", time.Now())
-		return config.DB.Model(&model.PlayerState{}).
-			Where("room_id = ? AND player_name = ?", event.RoomID, event.PlayerName).
-			Updates(map[string]interface{}{
-				"current_level": event.Level,
-				"elapsed_time":   0,
-				"updated_at":     time.Now(),
-			}).Error
+
+		query := config.DB.Model(&model.PlayerState{}).
+			Where("room_id = ? AND player_name = ?", event.RoomID, event.PlayerName)
+
+		if event.PlayerUID != "" {
+			query = config.DB.Model(&model.PlayerState{}).
+				Where("room_id = ? AND player_uid = ?", event.RoomID, event.PlayerUID)
+		}
+
+		return query.Updates(map[string]interface{}{
+			"current_level": event.Level,
+			"elapsed_time":  0,
+			"updated_at":    time.Now(),
+		}).Error
 
 	case "level_complete":
 		return config.DB.Transaction(func(tx *gorm.DB) error {
-			// Update room last_activity
-			tx.Model(&model.Room{}).Where("id = ?", event.RoomID).
-				Update("last_activity", time.Now())
+			if err := tx.Model(&model.Room{}).
+				Where("id = ?", event.RoomID).
+				Update("last_activity", time.Now()).Error; err != nil {
+				return err
+			}
+
+			query := tx.Where(
+				"room_id = ? AND player_name = ?",
+				event.RoomID,
+				event.PlayerName,
+			)
+
+			if event.PlayerUID != "" {
+				query = tx.Where(
+					"room_id = ? AND player_uid = ?",
+					event.RoomID,
+					event.PlayerUID,
+				)
+			}
 
 			var ps model.PlayerState
-			if err := tx.Where("room_id = ? AND player_name = ?", event.RoomID, event.PlayerName).First(&ps).Error; err != nil {
+			if err := query.First(&ps).Error; err != nil {
 				return err
 			}
 
@@ -301,13 +384,14 @@ func UpsertPlayerStateDB(event model.GameEvent) error {
 			completedLevels := ps.CompletedLevels + 1
 
 			updates := map[string]interface{}{
-				"level_times":       newTimes,
-				"completed_levels":   completedLevels,
-				"is_finished":       completedLevels >= 8,
-				"current_level":     event.Level,
-				"elapsed_time":      event.TimeSec, // single level time, not accumulated
-				"updated_at":        time.Now(),
+				"level_times":      newTimes,
+				"completed_levels": completedLevels,
+				"is_finished":      completedLevels >= 8,
+				"current_level":    event.Level,
+				"elapsed_time":     event.TimeSec,
+				"updated_at":       time.Now(),
 			}
+
 			return tx.Model(&ps).Updates(updates).Error
 		})
 
@@ -317,55 +401,109 @@ func UpsertPlayerStateDB(event model.GameEvent) error {
 			if err := tx.Where("id = ?", event.RoomID).First(&room).Error; err != nil {
 				return err
 			}
-			isPlayer1 := room.Player1Name == event.PlayerName
-			isPlayer2 := room.Player2Name == event.PlayerName
 
-			if !isPlayer1 && !isPlayer2 {
-				return nil // player not in room, nothing to do
+			// Cocokkan peserta menggunakan nama dan UID.
+			isPlayer1 := room.Player1Name == event.PlayerName &&
+				(event.PlayerUID == "" || room.Player1UID == event.PlayerUID)
+
+			isPlayer2 := room.Player2Name == event.PlayerName &&
+				(event.PlayerUID == "" || room.Player2UID == event.PlayerUID)
+
+			// Jika nama sama dan UID tidak diberikan, jangan menebak.
+			if event.PlayerUID == "" &&
+				room.Player1Name != "" &&
+				room.Player1Name == room.Player2Name &&
+				event.PlayerName == room.Player1Name {
+				return errors.New("player UID required for duplicate names")
 			}
 
-			// Delete player_state
-			if err := tx.Where("room_id = ? AND player_name = ?", event.RoomID, event.PlayerName).
-				Delete(&model.PlayerState{}).Error; err != nil {
+			if !isPlayer1 && !isPlayer2 {
+				return nil
+			}
+
+			// Hapus state milik peserta yang benar.
+			stateQuery := tx.Where(
+				"room_id = ? AND player_name = ?",
+				event.RoomID,
+				event.PlayerName,
+			)
+
+			if event.PlayerUID != "" {
+				stateQuery = tx.Where(
+					"room_id = ? AND player_uid = ?",
+					event.RoomID,
+					event.PlayerUID,
+				)
+			}
+
+			if err := stateQuery.Delete(&model.PlayerState{}).Error; err != nil {
 				return err
 			}
 
 			if isPlayer1 && room.Player2Name != "" {
-				// Promote player2 to player1
+				// Player 2 dipindahkan menjadi Player 1.
 				return tx.Model(&room).Updates(map[string]interface{}{
-					"player1_name":   room.Player2Name,
-					"player2_name":   "",
-					"player1_ready":  false,
-					"player2_ready":  false,
-					"status":         "waiting",
-					"last_activity":  time.Now(),
+					"player1_name":  room.Player2Name,
+					"player1_uid":   room.Player2UID,
+					"player2_name":  "",
+					"player2_uid":   "",
+					"player1_ready": false,
+					"player2_ready": false,
+					"status":        "waiting",
+					"last_activity": time.Now(),
 				}).Error
 			} else if isPlayer2 {
-				// Player2 leaves
+				// Player 2 keluar.
 				return tx.Model(&room).Updates(map[string]interface{}{
-					"player2_name":   "",
-					"player1_ready":  false,
-					"player2_ready":  false,
-					"status":         "waiting",
-					"last_activity":  time.Now(),
+					"player2_name":  "",
+					"player2_uid":   "",
+					"player1_ready": false,
+					"player2_ready": false,
+					"status":        "waiting",
+					"last_activity": time.Now(),
 				}).Error
 			}
-			// Only player — delete room
+
+			// Hanya ada satu peserta, jadi hapus ruangan.
 			return tx.Delete(&room).Error
 		})
 
 	case "heartbeat":
 		var ps model.PlayerState
-		err := config.DB.Where("room_id = ? AND player_name = ?", event.RoomID, event.PlayerName).First(&ps).Error
-		if err == nil {
-			return config.DB.Model(&ps).Update("updated_at", time.Now()).Error
+
+		query := config.DB.Where(
+			"room_id = ? AND player_name = ?",
+			event.RoomID,
+			event.PlayerName,
+		)
+
+		if event.PlayerUID != "" {
+			query = config.DB.Where(
+				"room_id = ? AND player_uid = ?",
+				event.RoomID,
+				event.PlayerUID,
+			)
 		}
+
+		err := query.First(&ps).Error
+
+		if err == nil {
+			return config.DB.Model(&ps).
+				Update("updated_at", time.Now()).Error
+		}
+
+		if err != gorm.ErrRecordNotFound {
+			return err
+		}
+
 		ps = model.PlayerState{
 			RoomID:     event.RoomID,
 			PlayerName: event.PlayerName,
+			PlayerUID:  event.PlayerUID,
 		}
+
 		return config.DB.Create(&ps).Error
-	}
+		}
 	return nil
 }
 
@@ -395,12 +533,13 @@ func GetRoomsV1(c *gin.Context) {
 func CreateRoom(c *gin.Context) {
 	var req struct {
 		PlayerName string `json:"player_name" binding:"required"`
+		PlayerUID  string `json:"player_uid" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "player_name is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "player_name and player_uid are required"})
 		return
 	}
-	room, err := CreateRoomDB(req.PlayerName)
+	room, err := CreateRoomDB(req.PlayerName, req.PlayerUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate a unique room code. Please try again."})
 		return
@@ -422,11 +561,14 @@ func GetRoom(c *gin.Context) {
 // JoinRoom — POST /api/v1/rooms/:code/join
 func JoinRoom(c *gin.Context) {
 	code := strings.ToUpper(c.Param("code"))
+
 	var req struct {
 		PlayerName string `json:"player_name" binding:"required"`
+		PlayerUID  string `json:"player_uid" binding:"required"`
 	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "player_name is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "player_name and player_uid are required"})
 		return
 	}
 
@@ -440,16 +582,18 @@ func JoinRoom(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "Room is full"})
 		return
 	}
-	if room.Player1Name == req.PlayerName {
+
+	if room.Player1UID == req.PlayerUID {
 		c.JSON(http.StatusConflict, gin.H{"error": "You are already in this room as player 1"})
 		return
 	}
 
-	room, err = JoinRoomDB(code, req.PlayerName)
+	room, err = JoinRoomDB(code, req.PlayerName, req.PlayerUID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
+
 	// Broadcast room_update via WS so lobby updates in real time
 	if wsManager != nil {
 		msg, _ := json.Marshal(websocket.GameMessage{
@@ -461,61 +605,110 @@ func JoinRoom(c *gin.Context) {
 		})
 		wsManager.BroadcastToRoom(room.ID, msg)
 	}
+
 	c.JSON(http.StatusOK, room)
 }
 
 // SetReady — POST /api/v1/rooms/:code/ready
 func SetReady(c *gin.Context) {
 	code := strings.ToUpper(c.Param("code"))
+
 	var req struct {
 		PlayerName string `json:"player_name" binding:"required"`
+		PlayerUID  string `json:"player_uid"`
 	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "player_name is required"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "player_name is required",
+		})
 		return
 	}
-	room, err := SetReadyDB(code, req.PlayerName)
+
+	room, err := SetReadyDB(code, req.PlayerName, req.PlayerUID)
 	if err != nil {
 		if err.Error() == "player not found in room" {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Player not found in this room"})
+			c.JSON(http.StatusNotFound, gin.H{
+				"error": "Player not found in this room",
+			})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+
+		if err.Error() == "player UID required for duplicate names" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "player_uid is required when players have the same name",
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Internal server error",
+		})
 		return
 	}
+
 	c.JSON(http.StatusOK, room)
 }
 
 // LeaveRoom — POST /api/v1/rooms/:code/leave
 func LeaveRoom(c *gin.Context) {
 	code := strings.ToUpper(c.Param("code"))
+
 	var req struct {
 		PlayerName string `json:"player_name" binding:"required"`
+		PlayerUID  string `json:"player_uid"`
 	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "player_name is required"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "player_name is required",
+		})
 		return
 	}
 
-	// Check room exists
 	room, err := GetRoomByCodeDB(code)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Room not found",
+		})
 		return
 	}
 
 	isPlayer1 := room.Player1Name == req.PlayerName
 	isPlayer2 := room.Player2Name == req.PlayerName
-	if !isPlayer1 && !isPlayer2 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Player not found in this room"})
+
+	if req.PlayerUID != "" {
+		isPlayer1 = isPlayer1 && room.Player1UID == req.PlayerUID
+		isPlayer2 = isPlayer2 && room.Player2UID == req.PlayerUID
+	} else if isPlayer1 && isPlayer2 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "player_uid is required when players have the same name",
+		})
 		return
 	}
 
-	_, err = LeaveRoomDB(code, req.PlayerName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+	if !isPlayer1 && !isPlayer2 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Player not found in this room",
+		})
 		return
 	}
+
+	_, err = LeaveRoomDB(code, req.PlayerName, req.PlayerUID)
+	if err != nil {
+		if err.Error() == "player UID required for duplicate names" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "player_uid is required when players have the same name",
+			})
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Internal server error",
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 

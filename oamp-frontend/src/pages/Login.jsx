@@ -21,11 +21,17 @@ export function Login() {
 
       // Simpan token dan data user untuk sesi login
       localStorage.setItem("token", token);
+
       const userWithPassword = {
         ...user,
         password: password,
       };
-      localStorage.setItem("currentUser", JSON.stringify(userWithPassword));
+
+      localStorage.setItem(
+        "currentUser",
+        JSON.stringify(userWithPassword)
+      );
+
       localStorage.setItem("role", user.role);
 
       console.log("Login berhasil:", user);

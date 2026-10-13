@@ -74,6 +74,11 @@ func SetupRoutes(r *gin.Engine) {
 		api.POST("/auth/registerParticipant", controller.Register)
 		api.POST("/auth/login", controller.Login)
 
+		// User - admin
+		api.GET("/users", middleware.AuthRequired(), controller.GetUsers)
+		api.PUT("/users/:id/password", middleware.AuthRequired(), controller.ResetUserPassword)
+
+		
 		api.GET("/auth/me", middleware.AuthRequired(), func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"user_id":   c.MustGet("user_id"),
@@ -82,6 +87,11 @@ func SetupRoutes(r *gin.Engine) {
 				"school_id": c.MustGet("school_id"),
 			})
 		})
+
+		// User profile - pengguna yang sedang login
+		api.GET("/profile", middleware.AuthRequired(), controller.GetMyProfile)
+		api.PUT("/profile", middleware.AuthRequired(), controller.UpdateMyProfile)
+		api.PUT("/profile/password", middleware.AuthRequired(), controller.ChangeMyPassword)
 
 		// Schools
 		api.GET("/schools", middleware.AuthRequired(), controller.GetSchools)

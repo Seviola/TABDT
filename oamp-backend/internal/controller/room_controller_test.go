@@ -17,7 +17,7 @@ func TestCreateRoomDB(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, err := CreateRoomDB("Alice")
+	room, err := CreateRoomDB("Alice", "alice1")
 	if err != nil {
 		t.Fatalf("CreateRoomDB failed: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestCreateRoomDB_CodeExcludesConfusable(t *testing.T) {
 	defer cleanupTestDB()
 
 	for i := 0; i < 20; i++ {
-		room, err := CreateRoomDB("Tester")
+		room, err := CreateRoomDB("Tester", "tester1")
 		if err != nil {
 			t.Fatalf("CreateRoomDB failed: %v", err)
 		}
@@ -56,13 +56,17 @@ func TestJoinRoomDB(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
-	updated, err := JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "alice1")
+
+	updated, err := JoinRoomDB(room.ID, "Bob", "bob1")
 	if err != nil {
 		t.Fatalf("JoinRoomDB failed: %v", err)
 	}
 	if updated.Player2Name != "Bob" {
 		t.Errorf("expected player2 Bob, got %s", updated.Player2Name)
+	}
+	if updated.Player2UID != "bob1" {
+		t.Errorf("expected player2 UID bob1, got %s", updated.Player2UID)
 	}
 	if updated.Status != "ready" {
 		t.Errorf("expected status ready, got %s", updated.Status)
@@ -73,9 +77,9 @@ func TestJoinRoomDB_RoomFull(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
-	_, err := JoinRoomDB(room.ID, "Charlie")
+	room, _ := CreateRoomDB("Alice", "alice1")
+	JoinRoomDB(room.ID, "Bob", "bob1")
+	_, err := JoinRoomDB(room.ID, "Charlie", "charlie1")
 	if err == nil || err.Error() != "room is full" {
 		t.Errorf("expected 'room is full' error, got %v", err)
 	}
@@ -85,10 +89,38 @@ func TestJoinRoomDB_AlreadyPlayer1(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
-	_, err := JoinRoomDB(room.ID, "Alice")
+	room, _ := CreateRoomDB("Alice", "alice1")
+	_, err := JoinRoomDB(room.ID, "Alice", "alice1")
 	if err == nil || err.Error() != "already player1" {
 		t.Errorf("expected 'already player1' error, got %v", err)
+	}
+}
+
+func TestJoinRoomDB_SameNameDifferentUIDAllowed(t *testing.T) {
+	setupTestDB(t)
+	defer cleanupTestDB()
+
+	room, _ := CreateRoomDB("Sevi", "sevi1")
+
+	updated, err := JoinRoomDB(room.ID, "Sevi", "sevi2")
+	if err != nil {
+		t.Fatalf("JoinRoomDB should allow same name with different UID: %v", err)
+	}
+
+	if updated.Player1Name != "Sevi" {
+		t.Errorf("expected player1 name Sevi, got %s", updated.Player1Name)
+	}
+
+	if updated.Player1UID != "sevi1" {
+		t.Errorf("expected player1 UID sevi1, got %s", updated.Player1UID)
+	}
+
+	if updated.Player2Name != "Sevi" {
+		t.Errorf("expected player2 name Sevi, got %s", updated.Player2Name)
+	}
+
+	if updated.Player2UID != "sevi2" {
+		t.Errorf("expected player2 UID sevi2, got %s", updated.Player2UID)
 	}
 }
 
@@ -96,8 +128,8 @@ func TestLeaveRoomDB_Player2Leaves(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "alice1")
+	JoinRoomDB(room.ID, "Bob", "bob1")
 	action, err := LeaveRoomDB(room.ID, "Bob")
 	if err != nil {
 		t.Fatalf("LeaveRoomDB failed: %v", err)
@@ -119,7 +151,7 @@ func TestLeaveRoomDB_Player1Leaves_Alone(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
+	room, _ := CreateRoomDB("Alice", "alice1")
 	action, err := LeaveRoomDB(room.ID, "Alice")
 	if err != nil {
 		t.Fatalf("LeaveRoomDB failed: %v", err)
@@ -138,8 +170,8 @@ func TestLeaveRoomDB_Player1Leaves_WithPlayer2(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "alice1")
+	JoinRoomDB(room.ID, "Bob", "bob1")
 	action, err := LeaveRoomDB(room.ID, "Alice")
 	if err != nil {
 		t.Fatalf("LeaveRoomDB failed: %v", err)
@@ -161,8 +193,8 @@ func TestSetReadyDB_BothReady_TransitionsToPlaying(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "alice1")
+	JoinRoomDB(room.ID, "Bob", "bob1")
 	SetReadyDB(room.ID, "Alice")
 	updated, err := SetReadyDB(room.ID, "Bob")
 	if err != nil {
@@ -180,7 +212,7 @@ func TestSetReadyDB_PlayerNotInRoom(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
+	room, _ := CreateRoomDB("Alice", "alice1")
 	_, err := SetReadyDB(room.ID, "Bob")
 	if err == nil || err.Error() != "player not found in room" {
 		t.Errorf("expected 'player not found in room', got %v", err)
@@ -301,7 +333,7 @@ func TestCreateRoomHTTP(t *testing.T) {
 	r := gin.New()
 	r.POST("/rooms", CreateRoom)
 
-	body, _ := json.Marshal(map[string]string{"player_name": "Alice"})
+	body, _ := json.Marshal(map[string]string{"player_name": "Alice", "player_uid":  "alice1",})
 	req := httptest.NewRequest(http.MethodPost, "/rooms", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -340,13 +372,16 @@ func TestJoinRoomHTTP(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
+	room, _ := CreateRoomDB("Alice", "alice1")
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.POST("/rooms/:code/join", JoinRoom)
 
-	body, _ := json.Marshal(map[string]string{"player_name": "Bob"})
+	body, _ := json.Marshal(map[string]string{
+		"player_name": "Bob",
+		"player_uid":  "bob1",
+	})
 	req := httptest.NewRequest(http.MethodPost, "/rooms/"+room.ID+"/join", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -366,14 +401,17 @@ func TestJoinRoomHTTP_RoomFull(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "alice1")
+	JoinRoomDB(room.ID, "Bob", "bob1")
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	r.POST("/rooms/:code/join", JoinRoom)
 
-	body, _ := json.Marshal(map[string]string{"player_name": "Charlie"})
+	body, _ := json.Marshal(map[string]string{
+		"player_name": "Charlie",
+		"player_uid":  "charlie1",
+	})
 	req := httptest.NewRequest(http.MethodPost, "/rooms/"+room.ID+"/join", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -388,7 +426,7 @@ func TestGetRoomHTTP(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
+	room, _ := CreateRoomDB("Alice", "alice1")
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -412,7 +450,7 @@ func TestLeaveRoomHTTP(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
+	room, _ := CreateRoomDB("Alice", "alice1")
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
@@ -479,8 +517,8 @@ func TestSubmitDuelResultDB_Player1Submits(t *testing.T) {
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 	config.DB.Create(&model.Participant{UID: "UID002", Name: "Bob", Age: 11, Grade: "5", Gender: "male", Height: 145, Weight: 38})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "UID001")
+	JoinRoomDB(room.ID, "Bob", "UID002")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 
@@ -506,8 +544,8 @@ func TestSubmitDuelResultDB_BothSubmit_Player1Wins(t *testing.T) {
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 	config.DB.Create(&model.Participant{UID: "UID002", Name: "Bob", Age: 11, Grade: "5", Gender: "male", Height: 145, Weight: 38})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "UID001")
+	JoinRoomDB(room.ID, "Bob", "UID002")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 
@@ -534,8 +572,8 @@ func TestSubmitDuelResultDB_BothSubmit_Player2Wins(t *testing.T) {
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 	config.DB.Create(&model.Participant{UID: "UID002", Name: "Bob", Age: 11, Grade: "5", Gender: "male", Height: 145, Weight: 38})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "UID001")
+	JoinRoomDB(room.ID, "Bob", "UID002")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 
@@ -559,8 +597,8 @@ func TestSubmitDuelResultDB_BothSubmit_Draw(t *testing.T) {
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 	config.DB.Create(&model.Participant{UID: "UID002", Name: "Bob", Age: 11, Grade: "5", Gender: "male", Height: 145, Weight: 38})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "UID001")
+	JoinRoomDB(room.ID, "Bob", "UID002")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 
@@ -581,7 +619,7 @@ func TestSubmitDuelResultDB_NotPlaying(t *testing.T) {
 	setupTestDB(t)
 	defer cleanupTestDB()
 
-	room, _ := CreateRoomDB("Alice")
+	room, _ := CreateRoomDB("Alice", "alice1")
 
 	_, _, err := SubmitDuelResultDB(room.ID, "UID001", 1, 80.0)
 	if err == nil || err.Error() != "room is not in playing state" {
@@ -595,8 +633,8 @@ func TestSubmitDuelResultDB_InvalidPlayerNum(t *testing.T) {
 
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "alice1")
+	JoinRoomDB(room.ID, "Bob", "bob1")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 
@@ -613,8 +651,8 @@ func TestGetDuelResultDB(t *testing.T) {
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 	config.DB.Create(&model.Participant{UID: "UID002", Name: "Bob", Age: 11, Grade: "5", Gender: "male", Height: 145, Weight: 38})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "UID001")
+	JoinRoomDB(room.ID, "Bob", "UID002")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 	SubmitDuelResultDB(room.ID, "UID001", 1, 60.0)
@@ -639,8 +677,8 @@ func TestSubmitDuelResultHTTP(t *testing.T) {
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 	config.DB.Create(&model.Participant{UID: "UID002", Name: "Bob", Age: 11, Grade: "5", Gender: "male", Height: 145, Weight: 38})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "UID001")
+	JoinRoomDB(room.ID, "Bob", "UID002")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 
@@ -670,8 +708,8 @@ func TestGetDuelResultHTTP(t *testing.T) {
 	config.DB.Create(&model.Participant{UID: "UID001", Name: "Alice", Age: 10, Grade: "4", Gender: "male", Height: 140, Weight: 35})
 	config.DB.Create(&model.Participant{UID: "UID002", Name: "Bob", Age: 11, Grade: "5", Gender: "male", Height: 145, Weight: 38})
 
-	room, _ := CreateRoomDB("Alice")
-	JoinRoomDB(room.ID, "Bob")
+	room, _ := CreateRoomDB("Alice", "UID001")
+	JoinRoomDB(room.ID, "Bob", "UID002")
 	SetReadyDB(room.ID, "Alice")
 	SetReadyDB(room.ID, "Bob")
 	SubmitDuelResultDB(room.ID, "UID001", 1, 60.0)

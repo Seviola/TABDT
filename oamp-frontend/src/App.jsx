@@ -17,6 +17,7 @@ import { Competitif } from "@/pages/Competitif";
 import { MatchDashboard } from "@/pages/MatchDashboard";
 import { Tournaments } from "@/pages/Tournaments";
 import { TournamentDetail } from "@/pages/TournamentDetail";
+import User from "@/pages/User";
 import { Admin } from "@/pages/Admin";
 import { EventDisplay } from "@/pages/EventDisplay";
 import { Home } from "@/pages/Home";
@@ -72,6 +73,7 @@ function App() {
                 <Route path="/export" element={<Export />} />
                 <Route path="/duel" element={<Competitif />} />
                 <Route path="/tournaments" element={<Tournaments />} />
+                <Route path="/users" element={<User />} />
                 <Route path="/tournament/:id" element={<TournamentDetail />} />
               </Route>
               <Route path="/match/:room_id" element={<MatchDashboard />} />
