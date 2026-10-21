@@ -279,7 +279,8 @@ export function Layout() {
                     if (userRole === "guru") {
                       return (
                         item.to !== "/tournaments" &&
-                        item.to !== "/register"
+                        item.to !== "/register" &&
+                        item.to !== "/users" 
                       );
                     }
 

@@ -89,6 +89,15 @@ type GameSession struct {
 	Mode            string        `json:"mode" gorm:"size:20"`
 	LevelReached    int           `json:"level_reached"`
 	TotalTime       float64       `json:"total_time"`
+
+	Task01          *float64 	  `json:"task01" gorm:"column:task01"`
+	Task02          *float64      `json:"task02" gorm:"column:task02"`
+	Task03          *float64 	  `json:"task03" gorm:"column:task03"`
+	Task04          *float64 	  `json:"task04" gorm:"column:task04"`
+	Task05          *float64 	  `json:"task05" gorm:"column:task05"`
+	Task06          *float64 	  `json:"task06" gorm:"column:task06"`
+	Task07          *float64      `json:"task07" gorm:"column:task07"`
+	Task08          *float64      `json:"task08" gorm:"column:task08"`
 	CognitiveAge    int           `json:"cognitive_age"`
 	VisuoSpatialFit float64       `json:"visuo_spatial_fit"`
 	DexterityScore  float64       `json:"dexterity_score"`

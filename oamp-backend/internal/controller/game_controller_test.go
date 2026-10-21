@@ -63,6 +63,44 @@ func TestSaveGameSession_Computation(t *testing.T) {
 	if session.Mode != "training" {
 		t.Errorf("expected mode training, got %s", session.Mode)
 	}
+	// Pastikan waktu setiap level tersimpan dengan benar.
+	expectedTimes := []*float64{
+		&result.Task01,
+		&result.Task02,
+		&result.Task03,
+		&result.Task04,
+		&result.Task05,
+		&result.Task06,
+		&result.Task07,
+		&result.Task08,
+	}
+
+	actualTimes := []*float64{
+		session.Task01,
+		session.Task02,
+		session.Task03,
+		session.Task04,
+		session.Task05,
+		session.Task06,
+		session.Task07,
+		session.Task08,
+	}
+
+	for i := range expectedTimes {
+		if actualTimes[i] == nil {
+			t.Errorf("Task%02d: waktu tidak tersimpan (nil)", i+1)
+			continue
+		}
+
+		if *actualTimes[i] != *expectedTimes[i] {
+			t.Errorf(
+				"Task%02d: diharapkan %f, didapat %f",
+				i+1,
+				*expectedTimes[i],
+				*actualTimes[i],
+			)
+		}
+	}
 }
 
 func TestSaveGameSession_HighScore(t *testing.T) {
