@@ -71,6 +71,12 @@ export function Layout() {
     if (stored === "light") return false;
     return window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
+  useEffect(() => {
+  const root = document.documentElement;
+
+  root.classList.toggle("dark", isDark);
+  localStorage.setItem("theme", isDark ? "dark" : "light");
+}, [isDark]);
 
   useEffect(() => {
     if (!profileOpen || !localStorage.getItem("token")) return;
@@ -256,7 +262,8 @@ export function Layout() {
                       return (
                         item.to !== "/children" &&
                         item.to !== "/pendaftaran" &&
-                        item.to !== "/schools"
+                        item.to !== "/schools" &&
+                        item.to !== "/users" 
                       );
                     }
 
@@ -316,10 +323,10 @@ export function Layout() {
                           : item.to
                       }
                       className={cn(
-                        "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold transition-all",
+                        "flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-colors",
                         isActive
-                          ? "bg-primary text-primary-foreground border border-border shadow-sm"
-                          : "text-muted-foreground hover:text-foreground hover:bg-white hover:border hover:border-border hover:shadow-sm dark:hover:bg-card"
+                          ? "bg-primary text-primary-foreground border-border shadow-sm"
+                          : "border-transparent text-muted-foreground hover:text-foreground hover:bg-white hover:border-border hover:shadow-sm dark:hover:bg-card"
                       )}
                     >
                       <item.icon className="h-4 w-4" />

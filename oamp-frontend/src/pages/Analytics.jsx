@@ -63,25 +63,50 @@ import { toast } from "sonner";
 
 const chartColors = [ "#3b82f6", "#22c55e", "#f59e0b", "#a855f7", "#ef4444", "#06b6d4", "#ec4899", "#84cc16", "#f97316", "#6366f1", ];
 
-function LevelTimeChart({ sessions }) {
+function LevelTimeChart({ sessions, gameResult }) {
   const [selectedAttempt, setSelectedAttempt] = useState("all");
-  const taskKeys = [ "task01", "task02", "task03", "task04", "task05", "task06", "task07", "task08" ];
 
-  // Hanya percobaan yang mempunyai data waktu L1-L8.
-  const validSessions = (sessions || [])
-    .map((session, index) => ({ session, index }))
-    .filter(({ session }) =>
-      taskKeys.some((key) => {
-        const value = session[key];
-        return (
-          value !== null &&
-          value !== undefined &&
-          value !== "" &&
-          Number.isFinite(Number(value)) &&
-          Number(value) > 0
-        );
-      })
-    );
+  const taskKeys = [
+    "task01", "task02", "task03", "task04",
+    "task05", "task06", "task07", "task08",
+  ];
+
+  const hasValidTime = (session) =>
+    taskKeys.some((key) => {
+      const value = session?.[key];
+
+      return (
+        value !== null &&
+        value !== undefined &&
+        value !== "" &&
+        Number.isFinite(Number(value)) &&
+        Number(value) > 0
+      );
+    });
+
+  // Utamakan riwayat sesi yang mempunyai data waktu per level.
+  const sessionData = (sessions || [])
+    .map((session, index) => ({
+      session,
+      index,
+      isLatestResult: false,
+    }))
+    .filter(({ session }) => hasValidTime(session));
+
+  // Jika semua sesi tidak mempunyai waktu per level,
+  // gunakan hasil terbaru dari endpoint results sebagai cadangan.
+  const validSessions =
+    sessionData.length > 0
+      ? sessionData
+      : hasValidTime(gameResult)
+        ? [
+            {
+              session: gameResult,
+              index: 0,
+              isLatestResult: true,
+            },
+          ]
+        : [];
 
   if (validSessions.length === 0) {
     return (
@@ -115,54 +140,61 @@ function LevelTimeChart({ sessions }) {
   const displayedSessions =
     selectedAttempt === "all"
       ? validSessions
-      : validSessions.filter(
-          ({ index }) => String(index + 1) === selectedAttempt
+      : validSessions.filter(({ index, isLatestResult }) =>
+          isLatestResult
+            ? selectedAttempt === "latest"
+            : String(index + 1) === selectedAttempt
         );
 
   return (
     <div className="w-full space-y-4">
-      {/* Judul dan Dropdown Filter */}
       <div className="flex w-full flex-row items-start justify-between gap-3">
         <h3 className="min-w-0 flex-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground sm:text-base">
-          {/* Riwayat Waktu Pengerjaan */}
+          Waktu per Level
         </h3>
 
         <Select
           value={selectedAttempt}
-          onValueChange={setSelectedAttempt}>
-          <SelectTrigger className="-mt-10 h-9 w-[170px] shrink-0 rounded-xl border border-rose-300 bg-background px-3 text-xs font-medium text-foreground shadow-sm transition hover:border-rose-400 focus:ring-2 focus:ring-rose-200 sm:w-[190px]">
+          onValueChange={setSelectedAttempt}
+        >
+          <SelectTrigger className="-mt-2 h-9 w-[170px] shrink-0 rounded-xl border border-rose-300 bg-background px-3 text-xs font-medium text-foreground shadow-sm transition hover:border-rose-400 focus:ring-2 focus:ring-rose-200 sm:w-[190px]">
             <SelectValue placeholder="Pilih Percobaan" />
           </SelectTrigger>
 
           <SelectContent className="rounded-2xl border border-rose-200 bg-background shadow-lg">
             <SelectItem value="all">Semua Percobaan</SelectItem>
 
-            {validSessions.map(({ index }) => (
-              <SelectItem key={index} value={String(index + 1)}>
-                P{index + 1}
+            {validSessions.map(({ index, isLatestResult }) => (
+              <SelectItem
+                key={isLatestResult ? "latest" : index}
+                value={isLatestResult ? "latest" : String(index + 1)}
+              >
+                {isLatestResult ? "Hasil Terbaru" : `P${index + 1}`}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
-      {/* Grafik garis */}
       <div className="h-[320px] w-full rounded-xl border border-border bg-card p-3 sm:p-4">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 12, right: 16, left: 4, bottom: 8 }}>
+            margin={{ top: 12, right: 16, left: 4, bottom: 8 }}
+          >
             <CartesianGrid
               strokeDasharray="3 3"
               vertical={false}
-              stroke="#e5e7eb"/>
+              stroke="#e5e7eb"
+            />
 
             <XAxis
               dataKey="level"
               tick={{ fontSize: 12, fill: "#6b7280" }}
               axisLine={{ stroke: "#e5e7eb" }}
               tickLine={false}
-              tickMargin={10}/>
+              tickMargin={10}
+            />
 
             <YAxis
               domain={[0, "auto"]}
@@ -170,7 +202,8 @@ function LevelTimeChart({ sessions }) {
               axisLine={false}
               tickLine={false}
               width={48}
-              tickFormatter={(value) => `${value}s`} />
+              tickFormatter={(value) => `${value}s`}
+            />
 
             <Tooltip
               contentStyle={{
@@ -183,14 +216,22 @@ function LevelTimeChart({ sessions }) {
                 marginBottom: 6,
               }}
               labelFormatter={(label) => `Level ${label.slice(1)}`}
-              formatter={(value, name) => [
-                `${Number(value).toFixed(2)} detik`,
-                `Percobaan P${String(name).replace("attempt", "")}`,
-              ]}/>
+              formatter={(value, name) => {
+                const session = displayedSessions.find(
+                  ({ index }) => `attempt${index + 1}` === name
+                );
 
-            {displayedSessions.map(({ index }, colorIndex) => (
+                const label = session?.isLatestResult
+                  ? "Hasil Terbaru"
+                  : `Percobaan P${String(name).replace("attempt", "")}`;
+
+                return [`${Number(value).toFixed(2)} detik`, label];
+              }}
+            />
+
+            {displayedSessions.map(({ index, isLatestResult }) => (
               <Line
-                key={index}
+                key={isLatestResult ? "latest" : index}
                 type="monotone"
                 dataKey={`attempt${index + 1}`}
                 name={`attempt${index + 1}`}
@@ -210,11 +251,10 @@ function LevelTimeChart({ sessions }) {
         </ResponsiveContainer>
       </div>
 
-      {/* Legenda mengikuti filter */}
       <div className="flex flex-wrap justify-center gap-x-5 gap-y-2">
-        {displayedSessions.map(({ index }, colorIndex) => (
+        {displayedSessions.map(({ index, isLatestResult }) => (
           <div
-            key={index}
+            key={isLatestResult ? "latest" : index}
             className="flex items-center gap-2 text-xs font-medium text-muted-foreground"
           >
             <span
@@ -223,7 +263,7 @@ function LevelTimeChart({ sessions }) {
                 backgroundColor: chartColors[index % chartColors.length],
               }}
             />
-            P{index + 1}
+            {isLatestResult ? "Hasil Terbaru" : `P${index + 1}`}
           </div>
         ))}
       </div>
@@ -233,15 +273,21 @@ function LevelTimeChart({ sessions }) {
 
 function TotalTimeAttemptChart({ sessions }) {
   const chartData = (sessions || [])
+    .filter((session) => {
+      const time = Number(session.total_time);
+
+      return (
+        session.total_time !== null &&
+        session.total_time !== undefined &&
+        session.total_time !== "" &&
+        Number.isFinite(time) &&
+        time > 0
+      );
+    })
     .map((session, index) => ({
       attempt: `P${index + 1}`,
       totalTime: Number(session.total_time),
-    }))
-    .filter(
-      (session) =>
-        Number.isFinite(session.totalTime) &&
-        session.totalTime > 0
-    );
+    }));
 
   if (chartData.length === 0) {
     return (
@@ -250,68 +296,82 @@ function TotalTimeAttemptChart({ sessions }) {
       </p>
     );
   }
+  // Lebar plot mengikuti jumlah percobaan,
+  const chartWidth = chartData.length * 56 + 48;
 
   return (
-    <div className="h-[320px] w-full rounded-xl border border-border bg-card p-3 sm:p-4">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={chartData}
-          margin={{ top: 12, right: 8, left: 4, bottom: 8 }}
-          barCategoryGap={0}
-        >
-          <CartesianGrid
-            strokeDasharray="3 3"
-            vertical={false}
-            stroke="#e5e7eb"
-          />
-          <XAxis
-            dataKey="attempt"
-            tick={{ fontSize: 12, fill: "#6b7280" }}
-            axisLine={{ stroke: "#e5e7eb" }}
-            tickLine={false}
-            tickMargin={10}
-          />
+    <div className="w-full rounded-xl border border-border bg-card p-3 sm:p-4">
+      <div className="w-full overflow-x-auto">
+        <div
+          style={{ width: `${chartWidth}px`, height: "220px", }} >
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{ top: 8, right: 4, left: 0, bottom: 4, }}
+              barCategoryGap={4}
+              barGap={0} >
 
-          <YAxis
-            domain={[0, "auto"]}
-            tick={{ fontSize: 11, fill: "#6b7280" }}
-            axisLine={false}
-            tickLine={false}
-            width={48}
-            tickFormatter={(value) => `${value}s`}
-          />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
 
-          <Tooltip
-            contentStyle={{
-              borderRadius: 12,
-              border: "1px solid #e5e7eb",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
-            }}
-            labelStyle={{
-              fontWeight: 700,
-              marginBottom: 6,
-            }}
-            formatter={(value) => [
-              `${Number(value).toFixed(2)} detik`,
-              "Total Waktu",
-            ]}
-            labelFormatter={(label) => `Percobaan ${label}`}
-          />
-          <Bar
-            dataKey="totalTime"
-            name="Total Waktu"
-            radius={[6, 6, 0, 0]}
-            maxBarSize={56}
-          >
-            {chartData.map((entry, index) => (
-              <Cell
-                key={entry.attempt}
-                fill={chartColors[index % chartColors.length]}
+              <XAxis
+              dataKey="attempt"
+              tick={{ fontSize: 11, fill: "#6b7280" }}
+              axisLine={{ stroke: "#e5e7eb" }}
+              tickLine={false}
+              tickMargin={6}
+              interval={0}
+              padding={{ left: 2, right: 2 }}
+              tickSize={0}
+            />
+
+              <YAxis
+                domain={[0, "auto"]}
+                tick={{ fontSize: 10, fill: "#6b7280" }}
+                axisLine={false}
+                tickLine={false}
+                width={38}
+                tickFormatter={(value) => `${value}s`}
               />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+
+              <Tooltip
+                contentStyle={{
+                  borderRadius: 12,
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.08)",
+                }}
+                labelStyle={{
+                  fontWeight: 700,
+                  marginBottom: 6,
+                }}
+                formatter={(value) => [
+                  `${Number(value).toFixed(2)} detik`,
+                  "Total Waktu",
+                ]}
+                labelFormatter={(label) =>
+                  `Percobaan ${label}`
+                }
+              />
+
+              <Bar
+                dataKey="totalTime"
+                name="Total Waktu"
+                barSize={36}
+                maxBarSize={36}
+                radius={[0, 0, 0, 0]}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell
+                    key={entry.attempt}
+                    fill={
+                      chartColors[index % chartColors.length]
+                    }
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }
@@ -687,7 +747,7 @@ export function Analytics() {
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
                 Riwayat Waktu Pengerjaan
               </p>
-              <LevelTimeChart sessions={sessions} />
+              <LevelTimeChart sessions={sessions} gameResult={gameResult}/>
             </div>
 
             {/* Grafik total waktu setiap percobaan */}
