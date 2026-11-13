@@ -20,22 +20,34 @@ Aplikasi ini terdiri dari dua *service* terpisah yang berkomunikasi via HTTP dan
                                           ┌────────▼─────────┐
                                           │    PostgreSQL    │
                                           └──────────────────┘
-## 🛠️ Tech Stack
+## Tech Stack
 
-### 🎨 Frontend (`oamp-frontend`)
-| Layer | Teknologi |
-|-------|-----------|
+### Frontend (`oamp-frontend`)
+
+| Layer | Technology |
+|-------|------------|
 | Framework | React 19 + Vite 8 |
-| Styling | Tailwind CSS v4, shadcn/ui |
-| State & Data | TanStack React Query, Axios |
+| Language | JavaScript (ES6+) |
+| Styling | Tailwind CSS v4 |
+| Components | shadcn/ui (Radix UI) |
 | Routing | React Router v7 |
+| Data Fetching | TanStack React Query |
+| HTTP Client | Axios |
+| Charts | Recharts |
+| Icons | Lucide React |
+| Toast | Sonner |
+| Payment | Midtrans Snap |
 | Deployment | Docker (Nginx) |
 
-### ⚙️ Backend (`oamp-backend`)
-| Layer | Teknologi |
-|-------|-----------|
-| Bahasa | Go (Golang) 1.25+ |
-| Framework HTTP | Gin Web Framework |
-| Database & ORM | PostgreSQL / SQLite + GORM |
-| Migrasi | golang-migrate |
+### Backend (`oamp-backend`)
+
+| Layer | Technology |
+|-------|------------|
+| Language | Go (Golang) 1.25+ |
+| Framework | Gin Web Framework |
+| Database | PostgreSQL / SQLite |
+| ORM | GORM |
+| Migration | golang-migrate |
 | Realtime | WebSocket |
+| Payment | Midtrans (Server API) |
+| Notifications | Telegram Bot API |
