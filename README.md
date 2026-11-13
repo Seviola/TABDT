@@ -20,26 +20,32 @@ Aplikasi ini terdiri dari dua *service* terpisah yang berkomunikasi via HTTP dan
                                           ┌────────▼─────────┐
                                           │    PostgreSQL    │
                                           └──────────────────┘
-Tech Stack
-Frontend (oamp-frontend)
-Layer	Technology
-Framework	React 19 + Vite 8
-Styling	Tailwind CSS v4
-Components	shadcn/ui (Radix UI)
-HTTP Client	Axios
-Charts	Recharts
-Routing	React Router v7
-Data Fetching	TanStack React Query
-Icons	Lucide React
-Toast	Sonner
-Payment	Midtrans Snap
-Backend (oamp-backend)
-Layer	Technology
-Language	Go (Golang) 1.25+
-Framework	Gin Web Framework
-Database	PostgreSQL / SQLite
-ORM	GORM
-Migration	golang-migrate
-Realtime	WebSocket
+## Tech Stack
+
+### Frontend (`oamp-frontend`)
+
+| Layer | Technology |
+|-------|------------|
+| Framework | React 19 + Vite 8 |
+| Styling | Tailwind CSS v4 |
+| Components | shadcn/ui (Radix UI) |
+| HTTP Client | Axios |
+| Charts | Recharts |
+| Routing | React Router v7 |
+| Data Fetching | TanStack React Query |
+| Icons | Lucide React |
+| Toast | Sonner |
+| Payment | Midtrans Snap |
+
+### Backend (`oamp-backend`)
+
+| Layer | Technology |
+|-------|------------|
+| Language | Go (Golang) 1.25+ |
+| Framework | Gin Web Framework |
+| Database | PostgreSQL / SQLite |
+| ORM | GORM |
+| Migration | golang-migrate |
+| Realtime | WebSocket |
 
 
