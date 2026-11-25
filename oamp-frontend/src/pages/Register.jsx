@@ -17,7 +17,7 @@ import {
 import { toast } from "sonner";
 import { UserPlus, Loader2 } from "lucide-react";
 
-const GRADES = ["4A", "4B", "4C", "5A", "5B", "5C", "6A", "6B", "6C"];
+const GRADES = ["Dosen", "Mahasiswa", "Tamu"];
 
 const initialForm = {
   uid: "",

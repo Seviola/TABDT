@@ -180,7 +180,7 @@ function LevelTimeChart({ sessions, gameResult }) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 12, right: 16, left: 4, bottom: 8 }}
+            margin={{ top: 12, right: 16, left: 4, bottom: 24 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -194,7 +194,7 @@ function LevelTimeChart({ sessions, gameResult }) {
               axisLine={{ stroke: "#e5e7eb" }}
               tickLine={false}
               tickMargin={10}
-            />
+              label={{ value: "Soal Permainan", position: "insideBottom", offset: -16, style: { fill: "#6b7280", fontSize: 12, fontWeight: 500, }, }}/>
 
             <YAxis
               domain={[0, "auto"]}
@@ -203,7 +203,7 @@ function LevelTimeChart({ sessions, gameResult }) {
               tickLine={false}
               width={48}
               tickFormatter={(value) => `${value}s`}
-            />
+              label={{ value: "Waktu (detik)", angle: -90, position: "insideLeft", offset: 10, style: { fill: "#6b7280", fontSize: 12, fontWeight: 500, textAnchor: "middle", },}} />
 
             <Tooltip
               contentStyle={{
@@ -303,35 +303,35 @@ function TotalTimeAttemptChart({ sessions }) {
     <div className="w-full rounded-xl border border-border bg-card p-3 sm:p-4">
       <div className="w-full overflow-x-auto">
         <div
-          style={{ width: `${chartWidth}px`, height: "220px", }} >
+          style={{ width: `${chartWidth}px`, height: "244px", }} >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              margin={{ top: 8, right: 4, left: 0, bottom: 4, }}
+              margin={{ top: 8, right: 4, left: 0, bottom: 28, }}
               barCategoryGap={4}
               barGap={0} >
 
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
 
               <XAxis
-              dataKey="attempt"
-              tick={{ fontSize: 11, fill: "#6b7280" }}
-              axisLine={{ stroke: "#e5e7eb" }}
-              tickLine={false}
-              tickMargin={6}
-              interval={0}
-              padding={{ left: 2, right: 2 }}
-              tickSize={0}
-            />
+                dataKey="attempt"
+                tick={{ fontSize: 11, fill: "#6b7280" }}
+                axisLine={{ stroke: "#e5e7eb" }}
+                tickLine={false}
+                tickMargin={6}
+                interval={0}
+                padding={{ left: 2, right: 2 }}
+                tickSize={0}
+                label={{ value: "Uji Coba", position: "insideBottom", offset: -22, style: { fill: "#6b7280", fontSize: 12,fontWeight: 500, }, }} />
 
               <YAxis
                 domain={[0, "auto"]}
                 tick={{ fontSize: 10, fill: "#6b7280" }}
                 axisLine={false}
                 tickLine={false}
-                width={38}
+                width={52}
                 tickFormatter={(value) => `${value}s`}
-              />
+                label={{ value: "Waktu (detik)", angle: -90, position: "insideLeft", offset: 8, style: { fill: "#6b7280",fontSize: 12, fontWeight: 500, textAnchor: "middle", }, }} />
 
               <Tooltip
                 contentStyle={{
@@ -973,7 +973,7 @@ export function Analytics() {
       </Card>
 
       {/* Score chart */}
-      {totalSessions > 0 && (
+      {/* {totalSessions > 0 && (
         <Card className="border border-border shadow-sm">
           <CardHeader className="bg-muted border-b border-border py-4">
             <CardTitle className="flex items-center gap-2 text-foreground text-base">
@@ -985,7 +985,7 @@ export function Analytics() {
             <SessionBarChart sessions={sessions} />
           </CardContent>
         </Card>
-      )}
+      )} */}
 
       {/* Payment Modal */}
       <Dialog open={paymentModalOpen} onOpenChange={setPaymentModalOpen}>
